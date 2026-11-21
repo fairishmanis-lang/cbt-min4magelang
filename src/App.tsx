@@ -1541,8 +1541,36 @@ function CbtMin4MagelangApp() {
               </>
             )}
 
-            <div className="border-t border-slate-200 pt-4 space-y-2">
-              <div className="text-[11px] font-bold text-slate-500 text-center">
+            {loginRoleTab === "ADMIN" && (
+  <div className="border-t border-slate-200 pt-4 space-y-2">
+    <div className="text-[11px] font-bold text-slate-500 text-center">
+      Ruang Pengujian Terisolasi (Label SIMULASI — Terpisah dari Data Produksi)
+    </div>
+    <div className="grid grid-cols-3 gap-2">
+      <button
+        type="button"
+        onClick={() => handleSimulationLogin?.("ADMIN")}
+        className="py-2 px-2 rounded-xl border border-amber-300 bg-amber-50 hover:bg-amber-100 text-amber-900 text-xs font-bold"
+      >
+        Simulasi ADMIN
+      </button>
+      <button
+        type="button"
+        onClick={() => handleSimulationLogin?.("GURU")}
+        className="py-2 px-2 rounded-xl border border-amber-300 bg-amber-50 hover:bg-amber-100 text-amber-900 text-xs font-bold"
+      >
+        Simulasi GURU
+      </button>
+      <button
+        type="button"
+        onClick={() => handleSimulationLogin?.("SISWA")}
+        className="py-2 px-2 rounded-xl border border-amber-300 bg-amber-50 hover:bg-amber-100 text-amber-900 text-xs font-bold"
+      >
+        Simulasi SISWA
+      </button>
+    </div>
+  </div>
+)}
                 Ruang Pengujian Terisolasi (Label SIMULASI — Terpisah dari Data Produksi)
               </div>
               <div className="grid grid-cols-3 gap-2">
