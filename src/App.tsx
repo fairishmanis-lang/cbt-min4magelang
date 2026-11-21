@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useRef } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import {
   LayoutDashboard,
   Building2,
@@ -17,10 +17,7 @@ import {
   FilePlus2,
   PlayCircle,
   History,
-  CheckCircle2,
-  AlertTriangle,
   ShieldCheck,
-  Lock,
   LogOut,
   Menu,
   X,
@@ -34,13 +31,8 @@ import {
   ChevronLeft,
   ChevronRight,
   Flag,
-  CheckSquare,
   FileText,
-  KeyRound,
   RefreshCw,
-  Eye,
-  Wifi,
-  WifiOff,
   Save,
   Copy
 } from "lucide-react";
@@ -322,7 +314,6 @@ function createSupabaseClient(url, anonKey, options = {}) {
 // ============================================================================
 const DEFAULT_SUPABASE_URL = "https://qlyajgeyuyjbjvsmcdjj.supabase.co";
 const DEFAULT_SUPABASE_ANON_KEY = "sb_publishable_Xpj_iUpn2C-hA0QlKOLmLg_GnXTJZ6k";
-
 const DEFAULT_KOP_IMAGE_SRC = "/image_3fe900.png";
 
 const DEFAULT_SCHOOL_SETTINGS = {
@@ -906,7 +897,6 @@ const evaluateSingleQuestionAnswer = (question, studentAnswer, formula = DEFAULT
     };
   }
 
-  // ISIAN_SINGKAT / ESSAY
   if (formula.isian_mode === "CASE_SENSITIVE") {
     const ok = rawAns === rawKey;
     return { status: ok ? "CORRECT" : "WRONG", earnedWeight: ok ? maxWeight : 0, maxWeight };
@@ -923,9 +913,11 @@ class ErrorBoundary extends React.Component {
     super(props);
     this.state = { hasError: false, errorMessage: "" };
   }
+
   static getDerivedStateFromError(error) {
     return { hasError: true, errorMessage: error?.message || "Terjadi kesalahan tampilan." };
   }
+
   render() {
     if (this.state.hasError) {
       return (
@@ -1007,7 +999,6 @@ function CbtMin4MagelangApp() {
   const [loginPassword, setLoginPassword] = useState("");
   const [failedAttempts, setFailedAttempts] = useState(0);
   const [lockoutUntil, setLockoutUntil] = useState(0);
-
   const [setupName, setSetupName] = useState("");
   const [setupUsername, setSetupUsername] = useState("");
   const [setupEmail, setSetupEmail] = useState("");
@@ -1022,7 +1013,6 @@ function CbtMin4MagelangApp() {
   const [schoolSettings, setSchoolSettings] = useState(DEFAULT_SCHOOL_SETTINGS);
   const [documentSettings, setDocumentSettings] = useState(DEFAULT_DOCUMENT_SETTINGS);
   const [gradingFormula, setGradingFormula] = useState(DEFAULT_GRADING_FORMULA);
-
   const [profilesList, setProfilesList] = useState([]);
   const [classesList, setClassesList] = useState([]);
   const [subjects, setSubjects] = useState([]);
@@ -1042,7 +1032,6 @@ function CbtMin4MagelangApp() {
     }, 6000);
   };
 
-  // Initial Check Admin & Session
   useEffect(() => {
     let mounted = true;
     const initAuthAndAdminCheck = async () => {
@@ -1057,11 +1046,9 @@ function CbtMin4MagelangApp() {
           .eq("role", "ADMIN")
           .eq("is_simulation", false)
           .limit(1);
-
         if (mounted) {
           setHasProductionAdmin(Array.isArray(adminRows) && adminRows.length > 0);
         }
-
         const { data: sessionData } = await supabase.auth.getSession();
         const authUser = sessionData?.session?.user;
         if (authUser && mounted) {
@@ -1087,7 +1074,6 @@ function CbtMin4MagelangApp() {
     };
   }, [supabase]);
 
-  // Fetch Operational Data (HTTP Polling - aman di sandbox tanpa WebSocket)
   const refreshAllData = async () => {
     if (!supabase) return;
     try {
@@ -1109,7 +1095,6 @@ function CbtMin4MagelangApp() {
 
       if (!currentUser) return;
       const simFlag = Boolean(isSimulationMode);
-
       const [
         profRes,
         clsRes,
@@ -1141,8 +1126,6 @@ function CbtMin4MagelangApp() {
       if (subRes.data) setSubjects(subRes.data);
       if (tchRes.data) setTeachers(tchRes.data);
       if (stdRes.data) setStudents(stdRes.data);
-
-      // Sanitasi ketat: kunci jawaban tidak pernah disimpan di state browser siswa
       if (qRes.data) {
         if (currentUser.role === "SISWA") {
           setQuestions(
@@ -1152,7 +1135,6 @@ function CbtMin4MagelangApp() {
           setQuestions(qRes.data);
         }
       }
-
       if (exRes.data) setExams(exRes.data);
       if (partRes.data) setParticipants(partRes.data);
       if (attRes.data) setAttempts(attRes.data);
@@ -1170,7 +1152,6 @@ function CbtMin4MagelangApp() {
     return () => clearInterval(timer);
   }, [supabase, currentUser, isSimulationMode]);
 
-  // Setup Administrator Utama
   const handleInitialAdminSetup = async (e) => {
     e.preventDefault();
     if (!supabase) return showBanner("error", "Koneksi Supabase belum terkonfigurasi.");
@@ -1185,14 +1166,12 @@ function CbtMin4MagelangApp() {
         password: setupPassword
       });
       if (signUpError) throw signUpError;
-
       const userId = signUpData?.user?.id;
       if (!userId) {
         throw new Error(
           "Akun Auth dibuat namun konfirmasi email aktif di Supabase. Nonaktifkan 'Confirm email' pada Auth Providers Supabase."
         );
       }
-
       const profilePayload = {
         id: userId,
         full_name: setupName.trim(),
@@ -1202,10 +1181,8 @@ function CbtMin4MagelangApp() {
         is_active: true,
         is_simulation: false
       };
-
       const { error: profError } = await supabase.from("profiles").insert([profilePayload]);
       if (profError) throw profError;
-
       setHasProductionAdmin(true);
       setCurrentUser(profilePayload);
       setIsSimulationMode(false);
@@ -1216,19 +1193,14 @@ function CbtMin4MagelangApp() {
     }
   };
 
-  // Login Multi-Peran
   const handleLoginSubmit = async (e) => {
     e.preventDefault();
     if (!supabase) return showBanner("error", "Koneksi Supabase belum terkonfigurasi.");
     if (Date.now() < lockoutUntil) {
       return showBanner("error", "Terlalu banyak percobaan gagal. Silakan tunggu 30 detik.");
     }
-
     try {
       const rawId = loginIdentifier.trim().toLowerCase();
-
-      // Alur khusus tab SISWA: baca dari tabel public.students berdasarkan nisn atau username
-      // dengan is_active = true dan is_simulation = false
       if (loginRoleTab === "SISWA") {
         const { data: studentRows, error: stErr } = await supabase
           .from("students")
@@ -1236,7 +1208,6 @@ function CbtMin4MagelangApp() {
           .eq("is_active", true)
           .eq("is_simulation", false)
           .or(`nisn.eq.${rawId},username.eq.${rawId}`);
-
         if (stErr) throw new Error(`Gagal memeriksa data siswa: ${stErr.message}`);
         const matchedStudent = Array.isArray(studentRows)
           ? studentRows.find(
@@ -1245,13 +1216,11 @@ function CbtMin4MagelangApp() {
                 String(s.username || "").trim().toLowerCase() === rawId
             )
           : null;
-
         if (!matchedStudent) {
           throw new Error(
             "Akun siswa tidak ditemukan, berstatus nonaktif, atau bukan akun siswa produksi."
           );
         }
-
         const expectedPassword = String(matchedStudent.password || "");
         if (!expectedPassword) {
           throw new Error(
@@ -1261,8 +1230,6 @@ function CbtMin4MagelangApp() {
         if (loginPassword !== expectedPassword) {
           throw new Error("Password siswa tidak sesuai.");
         }
-
-        // Coba sinkronkan sesi Supabase Auth jika akun Auth tersedia (opsional)
         const syntheticEmail = `${(matchedStudent.username || matchedStudent.nisn || matchedStudent.id)
           .toString()
           .trim()
@@ -1272,7 +1239,6 @@ function CbtMin4MagelangApp() {
           email: syntheticEmail,
           password: loginPassword
         });
-
         const studentProfile = {
           id: matchedStudent.id,
           full_name: matchedStudent.full_name,
@@ -1285,7 +1251,6 @@ function CbtMin4MagelangApp() {
           is_active: true,
           is_simulation: false
         };
-
         setFailedAttempts(0);
         setCurrentUser(studentProfile);
         setIsSimulationMode(false);
@@ -1295,14 +1260,12 @@ function CbtMin4MagelangApp() {
       }
 
       let targetEmail = rawId;
-
       if (!rawId.includes("@")) {
         const { data: foundProf } = await supabase
           .from("profiles")
           .select("*")
           .or(`username.eq.${rawId},nisn.eq.${rawId},nip.eq.${rawId}`)
           .maybeSingle();
-
         if (!foundProf) {
           throw new Error("Username / NISN / NIP tidak ditemukan.");
         }
@@ -1346,7 +1309,6 @@ function CbtMin4MagelangApp() {
     }
   };
 
-  // Masuk Mode Simulasi Terisolasi
   const enterSimulationSandbox = (role) => {
     const simUser = {
       id: `sim-${role.toLowerCase()}-001`,
@@ -1542,50 +1504,24 @@ function CbtMin4MagelangApp() {
             )}
 
             {loginRoleTab === "ADMIN" && (
-  <div className="border-t border-slate-200 pt-4 space-y-2">
-    <div className="text-[11px] font-bold text-slate-500 text-center">
-      Ruang Pengujian Terisolasi (Label SIMULASI — Terpisah dari Data Produksi)
-    </div>
-    <div className="grid grid-cols-3 gap-2">
-      <button
-        type="button"
-        onClick={() => handleSimulationLogin?.("ADMIN")}
-        className="py-2 px-2 rounded-xl border border-amber-300 bg-amber-50 hover:bg-amber-100 text-amber-900 text-xs font-bold"
-      >
-        Simulasi ADMIN
-      </button>
-      <button
-        type="button"
-        onClick={() => handleSimulationLogin?.("GURU")}
-        className="py-2 px-2 rounded-xl border border-amber-300 bg-amber-50 hover:bg-amber-100 text-amber-900 text-xs font-bold"
-      >
-        Simulasi GURU
-      </button>
-      <button
-        type="button"
-        onClick={() => handleSimulationLogin?.("SISWA")}
-        className="py-2 px-2 rounded-xl border border-amber-300 bg-amber-50 hover:bg-amber-100 text-amber-900 text-xs font-bold"
-      >
-        Simulasi SISWA
-      </button>
-    </div>
-  </div>
-)}
-                Ruang Pengujian Terisolasi (Label SIMULASI — Terpisah dari Data Produksi)
+              <div className="border-t border-slate-200 pt-4 space-y-2">
+                <div className="text-[11px] font-bold text-slate-500 text-center">
+                  Ruang Pengujian Terisolasi (Label SIMULASI — Terpisah dari Data Produksi)
+                </div>
+                <div className="grid grid-cols-3 gap-2">
+                  {["ADMIN", "GURU", "SISWA"].map((r) => (
+                    <button
+                      key={r}
+                      type="button"
+                      onClick={() => enterSimulationSandbox(r)}
+                      className="py-2 px-2 rounded-xl border border-amber-300 bg-amber-50 hover:bg-amber-100 text-amber-900 text-[11px] font-bold"
+                    >
+                      Simulasi {r}
+                    </button>
+                  ))}
+                </div>
               </div>
-              <div className="grid grid-cols-3 gap-2">
-                {["ADMIN", "GURU", "SISWA"].map((r) => (
-                  <button
-                    key={r}
-                    type="button"
-                    onClick={() => enterSimulationSandbox(r)}
-                    className="py-2 px-2 rounded-xl border border-amber-300 bg-amber-50 hover:bg-amber-100 text-amber-900 text-[11px] font-bold"
-                  >
-                    Simulasi {r}
-                  </button>
-                ))}
-              </div>
-            </div>
+            )}
 
             <div className="flex items-center justify-between text-[11px] text-slate-500 pt-1">
               <span>Supabase: {supabase ? "Terhubung" : "Belum Terhubung"}</span>
@@ -1650,7 +1586,6 @@ function CbtMin4MagelangApp() {
     if (!isMenuAllowed) {
       return <AccessDeniedView role={userRole} onBack={() => setActiveMenu("dashboard")} />;
     }
-
     switch (activeMenu) {
       case "dashboard":
         return (
@@ -1908,7 +1843,6 @@ function CbtMin4MagelangApp() {
 
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col md:flex-row">
-      {/* Sidebar Desktop & Mobile Drawer */}
       <aside
         className={`fixed inset-y-0 left-0 z-40 w-64 bg-emerald-900 text-white transform transition-transform md:relative md:translate-x-0 flex flex-col ${
           mobileMenuOpen ? "translate-x-0" : "-translate-x-full"
@@ -1970,7 +1904,6 @@ function CbtMin4MagelangApp() {
         </div>
       </aside>
 
-      {/* Main Content Area */}
       <div className="flex-1 flex flex-col min-w-0">
         <header className="bg-white border-b border-slate-200 px-4 py-3 flex items-center justify-between gap-3">
           <div className="flex items-center gap-3">
@@ -2346,7 +2279,6 @@ function ClassesManagerView({ supabase, classesList, students, isSimulation, onR
         insertedCount = validPayloads.length;
         await onRefresh();
       }
-
       setImportSummary({
         total: rawRows.length,
         success: insertedCount,
@@ -2583,7 +2515,6 @@ function SubjectsManagerView({ supabase, subjects, isSimulation, onRefresh, show
         insertedCount = validPayloads.length;
         await onRefresh();
       }
-
       setImportSummary({
         total: rawRows.length,
         success: insertedCount,
@@ -2803,7 +2734,6 @@ function TeachersManagerView({ supabase, teachers, subjects, isSimulation, onRef
           .toLowerCase()
           .replace(/\s+/g, ".");
         const rawSub = String(r.subject_id || r.mata_pelajaran || r.mapel || "").trim();
-
         if (!tName || !tUser) {
           errors.push(`Baris ${idx + 2}: kolom full_name dan username wajib diisi.`);
           return;
@@ -2812,7 +2742,6 @@ function TeachersManagerView({ supabase, teachers, subjects, isSimulation, onRef
           errors.push(`Baris ${idx + 2}: username "${tUser}" sudah terdaftar (dilewati).`);
           return;
         }
-
         let matchedSubjectId = null;
         if (rawSub) {
           const foundSub = subjects.find(
@@ -2830,7 +2759,6 @@ function TeachersManagerView({ supabase, teachers, subjects, isSimulation, onRef
             return;
           }
         }
-
         existingUsernames.add(tUser);
         validPayloads.push({
           full_name: tName,
@@ -2849,7 +2777,6 @@ function TeachersManagerView({ supabase, teachers, subjects, isSimulation, onRef
         insertedCount = validPayloads.length;
         await onRefresh();
       }
-
       setImportSummary({
         total: rawRows.length,
         success: insertedCount,
@@ -3115,7 +3042,6 @@ function StudentsManagerView({ supabase, students, classesList, isSimulation, on
           .trim()
           .toLowerCase();
         const stPass = String(r.password || r.sandi || stNisn || stNis || "123456").trim();
-
         if (!stName || !rawClass) {
           errors.push(`Baris ${idx + 2}: kolom full_name dan class_id (nama/ID kelas) wajib diisi.`);
           return;
@@ -3124,7 +3050,6 @@ function StudentsManagerView({ supabase, students, classesList, isSimulation, on
           errors.push(`Baris ${idx + 2}: NISN "${stNisn}" sudah terdaftar (dilewati).`);
           return;
         }
-
         const matchedClass = classesList.find(
           (c) =>
             String(c.id) === rawClass || (c.name || "").toLowerCase() === rawClass.toLowerCase()
@@ -3135,7 +3060,6 @@ function StudentsManagerView({ supabase, students, classesList, isSimulation, on
           );
           return;
         }
-
         if (stNisn) existingNisn.add(stNisn.toLowerCase());
         validPayloads.push({
           nis: stNis,
@@ -3156,7 +3080,6 @@ function StudentsManagerView({ supabase, students, classesList, isSimulation, on
         insertedCount = validPayloads.length;
         await onRefresh();
       }
-
       setImportSummary({
         total: rawRows.length,
         success: insertedCount,
@@ -3184,7 +3107,6 @@ function StudentsManagerView({ supabase, students, classesList, isSimulation, on
       fullName.trim().toLowerCase().replace(/\s+/g, "")
     ).toLowerCase();
     const cleanPassword = password.trim() || nisn.trim() || nis.trim() || "123456";
-
     const payload = {
       nis: nis.trim(),
       nisn: nisn.trim(),
@@ -3195,10 +3117,8 @@ function StudentsManagerView({ supabase, students, classesList, isSimulation, on
       is_active: true,
       is_simulation: Boolean(isSimulation)
     };
-
     const { error } = await supabase.from("students").insert([payload]);
     if (error) return showBanner("error", error.message);
-
     setLastCreatedCreds({
       full_name: payload.full_name,
       nisn: payload.nisn || "-",
@@ -3350,7 +3270,6 @@ function StudentsManagerView({ supabase, students, classesList, isSimulation, on
             ))}
           </select>
         </div>
-
         <div className="flex flex-wrap gap-2">
           <button
             type="button"
@@ -3532,12 +3451,10 @@ function QuestionBankManagerView({
         const qText = String(r.question_text || r.pertanyaan || r.soal || "").trim();
         const cAns = String(r.correct_answer || r.kunci_jawaban || r.kunci || "").trim();
         const qWeight = Number(r.weight || r.bobot || 1) || 1;
-
         if (!qText || !cAns) {
           errors.push(`Baris ${idx + 2}: kolom question_text dan correct_answer wajib diisi.`);
           return;
         }
-
         let matchedSubjectId = null;
         if (rawSub) {
           const foundSub = subjects.find(
@@ -3555,7 +3472,6 @@ function QuestionBankManagerView({
             return;
           }
         }
-
         let optionsJson = [];
         if (rawType === "PG" || rawType === "PG_KOMPLEKS") {
           const opts = [
@@ -3580,7 +3496,6 @@ function QuestionBankManagerView({
             { key: "TIDAK_TEPAT", text: "Tidak Tepat" }
           ];
         }
-
         validPayloads.push({
           subject_id: matchedSubjectId,
           topic: qTopic,
@@ -3601,7 +3516,6 @@ function QuestionBankManagerView({
         insertedCount = validPayloads.length;
         await onRefresh();
       }
-
       setImportSummary({
         total: rawRows.length,
         success: insertedCount,
@@ -3677,7 +3591,6 @@ function QuestionBankManagerView({
     const subName = filterSubject
       ? subjects.find((s) => s.id === filterSubject)?.name || "Semua Mapel"
       : "Semua Mata Pelajaran";
-
     const listHtml = `<ol style="padding-left:18px; line-height:1.5;">
       ${filteredQuestions
         .map((q) => {
@@ -3698,7 +3611,6 @@ function QuestionBankManagerView({
         })
         .join("")}
     </ol>`;
-
     const html = buildOfficialDocumentHtml({
       title: includeKey ? "BANK SOAL & KUNCI JAWABAN" : "DAFTAR BANK SOAL",
       subtitle: `Mata Pelajaran: ${subName}`,
@@ -3894,7 +3806,6 @@ function QuestionBankManagerView({
         </form>
       </div>
 
-      {/* Filter & Daftar Soal */}
       <div className="flex flex-wrap gap-3">
         <div className="flex items-center gap-2 bg-white border border-slate-200 rounded-xl px-3 py-2 flex-1 min-w-[200px]">
           <Search className="w-4 h-4 text-slate-400" />
@@ -4037,10 +3948,8 @@ function ExamsManagerView({
     if (examQuestions.length === 0) {
       return showBanner("error", "Butir soal untuk paket ujian ini tidak ditemukan.");
     }
-
     const sub = subjects.find((s) => s.id === exam.subject_id);
     const cls = classesList.find((c) => c.id === exam.class_id);
-
     const bodyHtml = `
       <div style="border:1px solid #1f2937; padding:8px 10px; margin-bottom:10px; font-size:10pt;">
         <strong>PETUNJUK PENGERJAAN:</strong><br/>
@@ -4063,7 +3972,6 @@ function ExamsManagerView({
           .join("")}
       </ol>
     `;
-
     const html = buildOfficialDocumentHtml({
       title: `NASKAH SOAL ${exam.title}`,
       subtitle: `${schoolSettings.school_name} • Tahun Pelajaran ${schoolSettings.academic_year}`,
@@ -4305,7 +4213,6 @@ function ParticipantsManagerView({
         is_eligible: true,
         is_simulation: Boolean(isSimulation)
       }));
-
     if (payloads.length === 0) {
       return showBanner("warning", "Seluruh siswa di kelas tersebut sudah terdaftar.");
     }
@@ -4348,7 +4255,6 @@ function ParticipantsManagerView({
         </tbody>
       </table>
     `;
-
     const html = buildOfficialDocumentHtml({
       title: "DAFTAR PESERTA & DAFTAR HADIR UJIAN",
       subtitle: exam.title,
@@ -4604,7 +4510,6 @@ function StudentExamPortalView({
   const handleSubmitExam = async (isAuto = false) => {
     if (!activeExam) return;
     setConfirmFinishOpen(false);
-
     if (supabase) {
       await supabase.from("exam_attempts").insert([
         {
@@ -4617,7 +4522,6 @@ function StudentExamPortalView({
         }
       ]);
 
-      // Koreksi otomatis berbasis kunci di server/query
       const { data: fullQuestions } = await supabase
         .from("questions")
         .select("*")
@@ -4660,7 +4564,6 @@ function StudentExamPortalView({
       }
       await onRefresh();
     }
-
     localStorage.removeItem(`cbt_min4_ans_${activeExam.id}_${currentUser.id}`);
     setActiveExam(null);
     showBanner(
@@ -4745,7 +4648,6 @@ function StudentExamPortalView({
                 <ChevronLeft className="w-4 h-4" />
                 Sebelumnya
               </button>
-
               {q && (
                 <button
                   type="button"
@@ -4762,7 +4664,6 @@ function StudentExamPortalView({
                   Tandai Ragu
                 </button>
               )}
-
               {currentIndex < activeQuestions.length - 1 ? (
                 <button
                   type="button"
@@ -4964,7 +4865,6 @@ function ResultsAndGradingView({
     const examQuestions = (exam.question_ids || [])
       .map((id) => questions.find((q) => q.id === id))
       .filter(Boolean);
-
     const examAns = studentAnswers.filter((a) => a.exam_id === selectedExamId);
     const studentIds = [...new Set(examAns.map((a) => a.student_id))];
 
@@ -4974,7 +4874,6 @@ function ResultsAndGradingView({
       let cCount = 0;
       let wCount = 0;
       let eCount = 0;
-
       examQuestions.forEach((q) => {
         const ansObj = examAns.find((a) => a.student_id === stId && a.question_id === q.id);
         const ev = evaluateSingleQuestionAnswer(q, ansObj?.answer, formulaForm);
@@ -4984,7 +4883,6 @@ function ResultsAndGradingView({
         else if (ev.status === "EMPTY") eCount++;
         else wCount++;
       });
-
       const existingRes = examResults.find(
         (r) => r.exam_id === selectedExamId && r.student_id === stId
       );
@@ -4992,7 +4890,6 @@ function ResultsAndGradingView({
         totalW > 0
           ? Number(((earnedW / totalW) * (formulaForm.max_score || 100)).toFixed(2))
           : 0;
-
       await supabase.from("exam_results").upsert({
         id: `${selectedExamId}_${stId}`,
         exam_id: selectedExamId,
@@ -5007,7 +4904,6 @@ function ResultsAndGradingView({
         updated_at: new Date().toISOString()
       });
     }
-
     await onRefresh();
     showBanner("success", "Perhitungan ulang nilai selesai berdasarkan kunci & rumus terbaru.");
   };
@@ -5068,7 +4964,6 @@ function ResultsAndGradingView({
             </option>
           ))}
         </select>
-
         {selectedExamId && (
           <button
             type="button"
@@ -5159,7 +5054,6 @@ function ItemAnalysisView({
     const results = examResults
       .filter((r) => r.exam_id === selectedExamId)
       .sort((a, b) => Number(b.score) - Number(a.score));
-
     const totalParticipants = results.length;
     const groupSize = totalParticipants >= 6 ? Math.max(1, Math.round(totalParticipants * 0.27)) : 0;
     const upperIds = new Set(results.slice(0, groupSize).map((r) => r.student_id));
@@ -5172,7 +5066,6 @@ function ItemAnalysisView({
       let wrong = 0;
       let upperCorrect = 0;
       let lowerCorrect = 0;
-
       results.forEach((res) => {
         const ans = studentAnswers.find(
           (a) => a.exam_id === selectedExamId && a.student_id === res.student_id && a.question_id === q.id
@@ -5186,7 +5079,6 @@ function ItemAnalysisView({
           wrong++;
         }
       });
-
       const pIndex = totalParticipants >= 3 ? Number((correct / totalParticipants).toFixed(2)) : null;
       const difficultyLabel =
         pIndex === null
@@ -5196,7 +5088,6 @@ function ItemAnalysisView({
             : pIndex >= 0.3
               ? "Sedang"
               : "Sukar";
-
       const dIndex =
         groupSize > 0 ? Number(((upperCorrect - lowerCorrect) / groupSize).toFixed(2)) : null;
       const discriminationLabel =
@@ -5209,7 +5100,6 @@ function ItemAnalysisView({
               : dIndex >= 0.2
                 ? "Cukup"
                 : "Perlu Revisi";
-
       return {
         no: idx + 1,
         question_text: q.question_text,
@@ -5495,7 +5385,6 @@ function OfficialReportsView({
             </option>
           ))}
         </select>
-
         <div className="flex flex-wrap gap-2">
           <button
             type="button"
@@ -5704,7 +5593,6 @@ function DocumentSettingsView({
           />
           Tampilkan Kop pada Word (.doc)
         </label>
-
         <div>
           <label className="block font-bold text-slate-700 mb-1">Ukuran Kertas</label>
           <select
@@ -5798,7 +5686,6 @@ function AdminSettingsView({
 }) {
   const [url, setUrl] = useState(supabaseUrl);
   const [key, setKey] = useState(supabaseKey);
-
   const [newName, setNewName] = useState("");
   const [newUser, setNewUser] = useState("");
   const [newEmail, setNewEmail] = useState("");
@@ -5818,7 +5705,6 @@ function AdminSettingsView({
       });
       if (authErr) throw authErr;
       if (!authData?.user?.id) throw new Error("Gagal membuat user di Supabase Auth.");
-
       const { error: profErr } = await supabase.from("profiles").insert([
         {
           id: authData.user.id,
