@@ -348,7 +348,7 @@ create table if not exists public.subjects (id uuid primary key default gen_rand
 create table if not exists public.teachers (id uuid primary key default gen_random_uuid(), full_name text not null, nip text, username text not null, subject_id uuid references public.subjects(id) on delete set null, is_active boolean not null default true, is_simulation boolean not null default false, created_at timestamptz not null default now());
 create table if not exists public.students (id uuid primary key default gen_random_uuid(), nis text, nisn text, full_name text not null, class_id uuid references public.classes(id) on delete restrict, username text not null, password text, is_active boolean not null default true, is_simulation boolean not null default false, created_at timestamptz not null default now());
 create table if not exists public.questions (id uuid primary key default gen_random_uuid(), subject_id uuid references public.subjects(id) on delete set null, topic text, type text not null, question_text text not null, options jsonb not null default '[]'::jsonb, correct_answer text not null, weight numeric not null default 1, is_verified boolean not null default true, is_simulation boolean not null default false, created_at timestamptz not null default now());
-create table if not exists public.exams (id uuid primary key default gen_random_uuid(), title text not null, subject_id uuid references public.subjects(id) on delete set null, class_id uuid references public.classes(id) on delete set null, exam_date text, start_time text, end_time text, duration_minutes integer not null default 60, instructions text, question_ids jsonb not null default '[]'::jsonb, status text not null default 'AKTIF', show_result_to_student boolean not null default true, is_simulation boolean not null default false, created_at timestamptz not null default now());
+create table if not exists public.exams (id uuid primary key default gen_random_uuid(), title text not null, subject_id uuid references public.subjects(id) on delete set null, class_id text, exam_date text, start_time text, end_time text, duration_minutes integer not null default 60, instructions text, question_ids jsonb not null default '[]'::jsonb, status text not null default 'AKTIF', show_result_to_student boolean not null default true, is_simulation boolean not null default false, created_at timestamptz not null default now());
 create table if not exists public.exam_participants (id uuid primary key default gen_random_uuid(), exam_id uuid references public.exams(id) on delete cascade, student_id uuid, student_name text not null, nis text, nisn text, class_id uuid, is_eligible boolean not null default true, is_simulation boolean not null default false, created_at timestamptz not null default now());
 create table if not exists public.exam_attempts (id uuid primary key default gen_random_uuid(), exam_id uuid references public.exams(id) on delete cascade, student_id text not null, student_name text not null, answers jsonb not null default '{}'::jsonb, status text not null default 'SELESAI', is_simulation boolean not null default false, submitted_at timestamptz not null default now());
 create table if not exists public.student_answers (id text primary key, exam_id uuid references public.exams(id) on delete cascade, student_id text not null, question_id uuid references public.questions(id) on delete cascade, answer text, is_simulation boolean not null default false, updated_at timestamptz not null default now());
@@ -3938,7 +3938,7 @@ function ExamsManagerView({
 }) {
   const [title, setTitle] = useState("");
   const [subjectId, setSubjectId] = useState("");
-  const [classId, setClassId] = useState("");
+  const [selectedClassIds, setSelectedClassIds] = useState([]);
   const [examDate, setExamDate] = useState("");
   const [startTime, setStartTime] = useState("08:00");
   const [endTime, setEndTime] = useState("09:30");
@@ -3973,17 +3973,33 @@ function ExamsManagerView({
       prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]
     );
   };
+  const toggleClassSelect = (id) => {
+    setSelectedClassIds((prev) =>
+      prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]
+    );
+  };
+  const handleToggleAllClasses = () => {
+    if (selectedClassIds.length === classesList.length) {
+      setSelectedClassIds([]);
+    } else {
+      setSelectedClassIds(classesList.map((c) => c.id));
+    }
+  };
   const handleCreateExam = async (e) => {
     e.preventDefault();
     if (!supabase) return;
     if (!title.trim() || !examDate || selectedQuestionIds.length === 0) {
       return showBanner("error", "Judul ujian, tanggal pelaksanaan, dan minimal 1 soal wajib dipilih.");
     }
+    const classIdValue =
+      selectedClassIds.length === 0 || selectedClassIds.length === classesList.length
+        ? null
+        : selectedClassIds.join(",");
     const { error } = await supabase.from("exams").insert([
       {
         title: title.trim(),
         subject_id: subjectId || null,
-        class_id: classId || null,
+        class_id: classIdValue,
         exam_date: examDate,
         start_time: startTime,
         end_time: endTime,
@@ -3997,6 +4013,7 @@ function ExamsManagerView({
     ]);
     if (error) return showBanner("error", error.message);
     setTitle("");
+    setSelectedClassIds([]);
     setSelectedQuestionIds([]);
     await onRefresh();
     showBanner("success", "Paket jadwal ujian berhasil dibuat.");
@@ -4010,7 +4027,17 @@ function ExamsManagerView({
       return showBanner("error", "Butir soal untuk paket ujian ini tidak ditemukan.");
     }
     const sub = subjects.find((s) => s.id === exam.subject_id);
-    const cls = classesList.find((c) => c.id === exam.class_id);
+    const targetClassList = String(exam.class_id || "")
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean);
+    const targetClassLabel =
+      targetClassList.length === 0
+        ? "Semua Kelas"
+        : targetClassList
+            .map((id) => classesList.find((c) => c.id === id)?.name)
+            .filter(Boolean)
+            .join(", ") || "-";
     const bodyHtml = `
       <div style="border:1px solid #1f2937; padding:8px 10px; margin-bottom:10px; font-size:10pt;">
         <strong>PETUNJUK PENGERJAAN:</strong><br/>
@@ -4038,7 +4065,7 @@ function ExamsManagerView({
       subtitle: `${schoolSettings.school_name} • Tahun Pelajaran ${schoolSettings.academic_year}`,
       metaRows: [
         { label: "Mata Pelajaran", value: sub?.name || "-" },
-        { label: "Kelas", value: cls?.name || "Semua Kelas" },
+        { label: "Kelas", value: targetClassLabel },
         { label: "Hari / Tanggal", value: exam.exam_date || "-" },
         {
           label: "Waktu / Durasi",
@@ -4089,20 +4116,54 @@ function ExamsManagerView({
               ))}
             </select>
           </div>
-          <div>
-            <label className="block font-bold text-slate-700 mb-1">Kelas Target</label>
-            <select
-              value={classId}
-              onChange={(e) => setClassId(e.target.value)}
-              className="w-full border border-slate-300 rounded-xl px-3 py-2"
-            >
-              <option value="">-- Semua Kelas --</option>
-              {classesList.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.name}
-                </option>
-              ))}
-            </select>
+          <div className="sm:col-span-3 space-y-1.5">
+            <div className="flex items-center justify-between">
+              <label className="block font-bold text-slate-700">
+                Kelas Target (
+                {selectedClassIds.length === 0
+                  ? "Semua Kelas"
+                  : `${selectedClassIds.length} kelas dipilih`}
+                )
+              </label>
+              {classesList.length > 0 && (
+                <button
+                  type="button"
+                  onClick={handleToggleAllClasses}
+                  className="text-[11px] font-bold text-emerald-700 hover:underline"
+                >
+                  {selectedClassIds.length === classesList.length
+                    ? "Kosongkan (Semua Kelas)"
+                    : "Pilih Semua Kelas"}
+                </button>
+              )}
+            </div>
+            <div className="flex flex-wrap gap-2 border border-slate-300 rounded-xl p-2.5 bg-slate-50">
+              {classesList.length === 0 ? (
+                <span className="text-slate-500">Belum ada data kelas.</span>
+              ) : (
+                classesList.map((c) => {
+                  const checked = selectedClassIds.includes(c.id);
+                  return (
+                    <label
+                      key={c.id}
+                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-bold cursor-pointer transition ${
+                        checked
+                          ? "bg-emerald-700 border-emerald-700 text-white"
+                          : "bg-white border-slate-200 text-slate-700 hover:bg-slate-100"
+                      }`}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={checked}
+                        onChange={() => toggleClassSelect(c.id)}
+                        className="hidden"
+                      />
+                      <span>{c.name}</span>
+                    </label>
+                  );
+                })
+              )}
+            </div>
           </div>
           <div>
             <label className="block font-bold text-slate-700 mb-1">Tanggal Ujian</label>
@@ -4511,12 +4572,25 @@ function StudentExamPortalView({
         .filter(
           (p) =>
             p.student_id === currentUser.id ||
-            (p.nisn && p.nisn === currentUser.nisn) ||
-            (p.student_name || "").toLowerCase() === (currentUser.full_name || "").toLowerCase()
+            (p.nisn &&
+              currentUser.nisn &&
+              String(p.nisn).trim() === String(currentUser.nisn).trim()) ||
+            (p.student_name || "").trim().toLowerCase() ===
+              (currentUser.full_name || "").trim().toLowerCase()
         )
         .map((p) => p.exam_id)
     );
-    return exams.filter((e) => myPartExamIds.has(e.id));
+    return exams.filter((e) => {
+      const isAssignedAsParticipant = myPartExamIds.has(e.id);
+      const targetClassList = String(e.class_id || "")
+        .split(",")
+        .map((s) => s.trim())
+        .filter(Boolean);
+      const matchesTargetClass =
+        targetClassList.length === 0 ||
+        (currentUser.class_id && targetClassList.includes(String(currentUser.class_id)));
+      return (isAssignedAsParticipant || matchesTargetClass) && e.status !== "NONAKTIF";
+    });
   }, [exams, participants, currentUser, isSimulation]);
   const activeQuestions = useMemo(() => {
     if (!activeExam) return [];
@@ -4847,7 +4921,17 @@ function StudentExamPortalView({
             (a) => a.exam_id === ex.id && a.student_id === currentUser.id
           );
           const sub = subjects.find((s) => s.id === ex.subject_id);
-          const cls = classesList.find((c) => c.id === ex.class_id);
+          const targetClassList = String(ex.class_id || "")
+            .split(",")
+            .map((s) => s.trim())
+            .filter(Boolean);
+          const classLabel =
+            targetClassList.length === 0
+              ? "Semua Kelas"
+              : targetClassList
+                  .map((id) => classesList.find((c) => c.id === id)?.name)
+                  .filter(Boolean)
+                  .join(", ") || "-";
           return (
             <div
               key={ex.id}
@@ -4855,7 +4939,7 @@ function StudentExamPortalView({
             >
               <div className="space-y-1">
                 <span className="px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-800 text-[11px] font-bold">
-                  {sub?.name || "Ujian"} • {cls?.name || "Semua Kelas"}
+                  {sub?.name || "Ujian"} • {classLabel}
                 </span>
                 <h3 className="text-sm font-extrabold text-slate-900">{ex.title}</h3>
                 <p className="text-xs text-slate-500">
