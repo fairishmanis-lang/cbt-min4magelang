@@ -34,7 +34,8 @@ import {
   FileText,
   RefreshCw,
   Save,
-  Copy
+  Copy,
+  Pencil
 } from "lucide-react";
 
 // ============================================================================
@@ -53,7 +54,6 @@ class SupabaseRestQueryBuilder {
     this.preferHeaders = [];
     this.singleMode = null;
   }
-
   getHeaders(extra = {}) {
     const token =
       !this.isPublicLookup && this.sessionTokenRef?.current?.access_token
@@ -66,7 +66,6 @@ class SupabaseRestQueryBuilder {
       ...extra
     };
   }
-
   select(columns = "*") {
     if (this.method === "GET") {
       this.queryParams.push(`select=${encodeURIComponent(columns)}`);
@@ -75,19 +74,16 @@ class SupabaseRestQueryBuilder {
     }
     return this;
   }
-
   eq(col, val) {
     this.queryParams.push(`${encodeURIComponent(col)}=eq.${encodeURIComponent(String(val))}`);
     return this;
   }
-
   in(col, vals) {
     const arr = Array.isArray(vals) ? vals : [];
     const formatted = arr.map((v) => `"${String(v).replace(/"/g, "")}"`).join(",");
     this.queryParams.push(`${encodeURIComponent(col)}=in.(${encodeURIComponent(formatted)})`);
     return this;
   }
-
   or(filterStr) {
     const parts = String(filterStr || "")
       .split(",")
@@ -105,50 +101,48 @@ class SupabaseRestQueryBuilder {
     }
     return this;
   }
-
   order(col, opts = {}) {
     const dir = opts.ascending === false ? "desc" : "asc";
     this.queryParams.push(`order=${encodeURIComponent(col)}.${dir}`);
     return this;
   }
-
   limit(n) {
     this.queryParams.push(`limit=${Number(n) || 10}`);
     return this;
   }
-
   insert(rows) {
     this.method = "POST";
     this.bodyData = Array.isArray(rows) ? rows : [rows];
     this.preferHeaders.push("return=representation");
     return this;
   }
-
+  update(values) {
+    this.method = "PATCH";
+    this.bodyData = values;
+    this.preferHeaders.push("return=representation");
+    return this;
+  }
   upsert(rowOrRows) {
     this.method = "POST";
     this.bodyData = Array.isArray(rowOrRows) ? rowOrRows : [rowOrRows];
     this.preferHeaders.push("resolution=merge-duplicates", "return=representation");
     return this;
   }
-
   delete() {
     this.method = "DELETE";
     this.preferHeaders.push("return=representation");
     return this;
   }
-
   maybeSingle() {
     this.singleMode = "maybeSingle";
     this.limit(1);
     return this;
   }
-
   single() {
     this.singleMode = "single";
     this.limit(1);
     return this;
   }
-
   async execute() {
     try {
       const qs = this.queryParams.length > 0 ? `?${this.queryParams.join("&")}` : "";
@@ -171,7 +165,6 @@ class SupabaseRestQueryBuilder {
           parsed?.message || parsed?.error_description || parsed?.msg || `HTTP ${res.status}`;
         return { data: null, error: { message: msg } };
       }
-
       if (this.singleMode === "maybeSingle") {
         const arr = Array.isArray(parsed) ? parsed : [];
         return { data: arr[0] || null, error: null };
@@ -188,7 +181,6 @@ class SupabaseRestQueryBuilder {
       return { data: null, error: { message: err?.message || "Kesalahan jaringan Supabase." } };
     }
   }
-
   then(resolve, reject) {
     return this.execute().then(resolve, reject);
   }
@@ -199,7 +191,6 @@ function createSupabaseClient(url, anonKey, options = {}) {
   const cleanKey = String(anonKey || "").trim();
   const persist = options?.auth?.persistSession !== false;
   const storageKey = "cbt_min4_sb_session";
-
   const sessionRef = {
     current: persist
       ? (() => {
@@ -212,7 +203,6 @@ function createSupabaseClient(url, anonKey, options = {}) {
         })()
       : null
   };
-
   const saveSession = (sess) => {
     sessionRef.current = sess;
     if (persist) {
@@ -224,7 +214,6 @@ function createSupabaseClient(url, anonKey, options = {}) {
       }
     }
   };
-
   return {
     from(table) {
       const publicLookup = table === "profiles" && !sessionRef.current?.access_token;
@@ -315,7 +304,6 @@ function createSupabaseClient(url, anonKey, options = {}) {
 const DEFAULT_SUPABASE_URL = "https://qlyajgeyuyjbjvsmcdjj.supabase.co";
 const DEFAULT_SUPABASE_ANON_KEY = "sb_publishable_Xpj_iUpn2C-hA0QlKOLmLg_GnXTJZ6k";
 const DEFAULT_KOP_IMAGE_SRC = "/image_3fe900.png";
-
 const DEFAULT_SCHOOL_SETTINGS = {
   school_name: "MIN 4 MAGELANG",
   app_name: "CBT MIN 4 MAGELANG",
@@ -331,7 +319,6 @@ const DEFAULT_SCHOOL_SETTINGS = {
   email: "min.mlangen@gmail.com",
   logo_base64: ""
 };
-
 const DEFAULT_DOCUMENT_SETTINGS = {
   kop_image: DEFAULT_KOP_IMAGE_SRC,
   use_kop_pdf: true,
@@ -348,7 +335,6 @@ const DEFAULT_DOCUMENT_SETTINGS = {
   show_page_number: true,
   show_print_date: true
 };
-
 const DEFAULT_GRADING_FORMULA = {
   pg_kompleks_mode: "PROPORTIONAL",
   isian_mode: "CASE_INSENSITIVE",
@@ -356,7 +342,6 @@ const DEFAULT_GRADING_FORMULA = {
   max_score: 100,
   kkm: 75
 };
-
 const SQL_SCHEMA_SCRIPT = `-- Jalankan di SQL Editor Supabase
 create extension if not exists "pgcrypto";
 create table if not exists public.school_settings (id text primary key, data jsonb not null default '{}'::jsonb, updated_at timestamptz not null default now());
@@ -499,7 +484,6 @@ const buildOfficialDocumentHtml = ({
   const sch = { ...DEFAULT_SCHOOL_SETTINGS, ...schoolSettings };
   const kopSrc = cfg.kop_image || DEFAULT_KOP_IMAGE_SRC;
   const printDate = getFormattedPrintDate();
-
   const metaHtml =
     metaRows.length > 0
       ? `<table class="meta-table">
@@ -513,7 +497,6 @@ const buildOfficialDocumentHtml = ({
           </tbody>
         </table>`
       : "";
-
   const signatureHtml = includeSignature
     ? `<div class="signature-grid">
         <div></div>
@@ -526,7 +509,6 @@ const buildOfficialDocumentHtml = ({
         </div>
       </div>`
     : "";
-
   return `<!DOCTYPE html>
 <html lang="id">
 <head>
@@ -743,10 +725,8 @@ const exportOfficialExcelWithKop = async ({
       fitToHeight: 0
     }
   });
-
   const colCount = Math.max(columns.length, 4);
   ws.columns = columns.map((c) => ({ header: "", key: c.key, width: c.width || 18 }));
-
   let currentRow = 1;
   if (cfg.use_kop_excel) {
     const base64Img = await fetchImageAsBase64(cfg.kop_image || DEFAULT_KOP_IMAGE_SRC);
@@ -763,7 +743,6 @@ const exportOfficialExcelWithKop = async ({
       currentRow = 7;
     }
   }
-
   if (isSimulation) {
     ws.mergeCells(currentRow, 1, currentRow, colCount);
     const simCell = ws.getCell(currentRow, 1);
@@ -772,14 +751,12 @@ const exportOfficialExcelWithKop = async ({
     simCell.alignment = { horizontal: "center" };
     currentRow++;
   }
-
   ws.mergeCells(currentRow, 1, currentRow, colCount);
   const titleCell = ws.getCell(currentRow, 1);
   titleCell.value = title;
   titleCell.font = { bold: true, size: 13 };
   titleCell.alignment = { horizontal: "center" };
   currentRow++;
-
   if (subtitle) {
     ws.mergeCells(currentRow, 1, currentRow, colCount);
     const subCell = ws.getCell(currentRow, 1);
@@ -788,7 +765,6 @@ const exportOfficialExcelWithKop = async ({
     subCell.alignment = { horizontal: "center" };
     currentRow++;
   }
-
   currentRow++;
   const headerRowIndex = currentRow;
   const headerRow = ws.getRow(headerRowIndex);
@@ -808,7 +784,6 @@ const exportOfficialExcelWithKop = async ({
   headerRow.height = 24;
   ws.pageSetup.printTitlesRow = `${headerRowIndex}:${headerRowIndex}`;
   currentRow++;
-
   rows.forEach((rowObj) => {
     const r = ws.getRow(currentRow);
     columns.forEach((col, i) => {
@@ -824,7 +799,6 @@ const exportOfficialExcelWithKop = async ({
     });
     currentRow++;
   });
-
   const buffer = await workbook.xlsx.writeBuffer();
   const blob = new Blob([buffer], {
     type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
@@ -847,11 +821,9 @@ const evaluateSingleQuestionAnswer = (question, studentAnswer, formula = DEFAULT
   const maxWeight = Number(question.weight) || 1;
   const rawAns = String(studentAnswer ?? "").trim();
   const rawKey = String(question.correct_answer ?? "").trim();
-
   if (!rawAns) {
     return { status: "EMPTY", earnedWeight: 0, maxWeight };
   }
-
   const qType = String(question.type || "PG").toUpperCase();
   if (qType === "PG" || qType === "BENAR_SALAH" || qType === "TEPAT_TIDAK_TEPAT") {
     const isMatch = rawAns.toUpperCase() === rawKey.toUpperCase();
@@ -861,7 +833,6 @@ const evaluateSingleQuestionAnswer = (question, studentAnswer, formula = DEFAULT
       maxWeight
     };
   }
-
   if (qType === "PG_KOMPLEKS") {
     const ansSet = new Set(
       rawAns
@@ -876,14 +847,12 @@ const evaluateSingleQuestionAnswer = (question, studentAnswer, formula = DEFAULT
         .filter(Boolean)
     );
     if (keySet.size === 0) return { status: "WRONG", earnedWeight: 0, maxWeight };
-
     let correctHits = 0;
     let wrongHits = 0;
     ansSet.forEach((a) => {
       if (keySet.has(a)) correctHits++;
       else wrongHits++;
     });
-
     if (formula.pg_kompleks_mode === "STRICT") {
       const exact = correctHits === keySet.size && wrongHits === 0;
       return { status: exact ? "CORRECT" : "WRONG", earnedWeight: exact ? maxWeight : 0, maxWeight };
@@ -896,7 +865,6 @@ const evaluateSingleQuestionAnswer = (question, studentAnswer, formula = DEFAULT
       maxWeight
     };
   }
-
   if (formula.isian_mode === "CASE_SENSITIVE") {
     const ok = rawAns === rawKey;
     return { status: ok ? "CORRECT" : "WRONG", earnedWeight: ok ? maxWeight : 0, maxWeight };
@@ -913,11 +881,9 @@ class ErrorBoundary extends React.Component {
     super(props);
     this.state = { hasError: false, errorMessage: "" };
   }
-
   static getDerivedStateFromError(error) {
     return { hasError: true, errorMessage: error?.message || "Terjadi kesalahan tampilan." };
   }
-
   render() {
     if (this.state.hasError) {
       return (
@@ -975,7 +941,6 @@ function CbtMin4MagelangApp() {
     () => localStorage.getItem("cbt_min4_sb_key") || DEFAULT_SUPABASE_ANON_KEY
   );
   const [showSchemaModal, setShowSchemaModal] = useState(false);
-
   const supabase = useMemo(() => {
     if (!supabaseUrl || !supabaseKey) return null;
     try {
@@ -986,14 +951,10 @@ function CbtMin4MagelangApp() {
       return null;
     }
   }, [supabaseUrl, supabaseKey]);
-
-  // Auth & Role State
   const [currentUser, setCurrentUser] = useState(null);
   const [isSimulationMode, setIsSimulationMode] = useState(false);
   const [hasProductionAdmin, setHasProductionAdmin] = useState(true);
   const [authLoading, setAuthLoading] = useState(true);
-
-  // Login / Setup Form State
   const [loginRoleTab, setLoginRoleTab] = useState("ADMIN");
   const [loginIdentifier, setLoginIdentifier] = useState("");
   const [loginPassword, setLoginPassword] = useState("");
@@ -1003,13 +964,9 @@ function CbtMin4MagelangApp() {
   const [setupUsername, setSetupUsername] = useState("");
   const [setupEmail, setSetupEmail] = useState("");
   const [setupPassword, setSetupPassword] = useState("");
-
-  // Navigation & Banner
   const [activeMenu, setActiveMenu] = useState("dashboard");
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [banner, setBanner] = useState(null);
-
-  // Core Data Collections
   const [schoolSettings, setSchoolSettings] = useState(DEFAULT_SCHOOL_SETTINGS);
   const [documentSettings, setDocumentSettings] = useState(DEFAULT_DOCUMENT_SETTINGS);
   const [gradingFormula, setGradingFormula] = useState(DEFAULT_GRADING_FORMULA);
@@ -1092,7 +1049,6 @@ function CbtMin4MagelangApp() {
           setGradingFormula((prev) => ({ ...prev, ...formulaRow.data }));
         }
       }
-
       if (!currentUser) return;
       const simFlag = Boolean(isSimulationMode);
       const [
@@ -1113,14 +1069,21 @@ function CbtMin4MagelangApp() {
         supabase.from("subjects").select("*").eq("is_simulation", simFlag).order("name"),
         supabase.from("teachers").select("*").eq("is_simulation", simFlag).order("full_name"),
         supabase.from("students").select("*").eq("is_simulation", simFlag).order("full_name"),
-        supabase.from("questions").select("*").eq("is_simulation", simFlag).order("created_at", { ascending: false }),
-        supabase.from("exams").select("*").eq("is_simulation", simFlag).order("created_at", { ascending: false }),
+        supabase
+          .from("questions")
+          .select("*")
+          .eq("is_simulation", simFlag)
+          .order("created_at", { ascending: false }),
+        supabase
+          .from("exams")
+          .select("*")
+          .eq("is_simulation", simFlag)
+          .order("created_at", { ascending: false }),
         supabase.from("exam_participants").select("*").eq("is_simulation", simFlag),
         supabase.from("exam_attempts").select("*").eq("is_simulation", simFlag),
         supabase.from("student_answers").select("*").eq("is_simulation", simFlag),
         supabase.from("exam_results").select("*").eq("is_simulation", simFlag)
       ]);
-
       if (profRes.data) setProfilesList(profRes.data);
       if (clsRes.data) setClassesList(clsRes.data);
       if (subRes.data) setSubjects(subRes.data);
@@ -1128,9 +1091,7 @@ function CbtMin4MagelangApp() {
       if (stdRes.data) setStudents(stdRes.data);
       if (qRes.data) {
         if (currentUser.role === "SISWA") {
-          setQuestions(
-            qRes.data.map(({ correct_answer, ...safeQuestion }) => safeQuestion)
-          );
+          setQuestions(qRes.data.map(({ correct_answer, ...safeQuestion }) => safeQuestion));
         } else {
           setQuestions(qRes.data);
         }
@@ -1258,7 +1219,6 @@ function CbtMin4MagelangApp() {
         showBanner("success", `Selamat datang, ${matchedStudent.full_name} (SISWA).`);
         return;
       }
-
       let targetEmail = rawId;
       if (!rawId.includes("@")) {
         const { data: foundProf } = await supabase
@@ -1271,13 +1231,11 @@ function CbtMin4MagelangApp() {
         }
         targetEmail = foundProf.email;
       }
-
       const { data: authData, error: authErr } = await supabase.auth.signInWithPassword({
         email: targetEmail,
         password: loginPassword
       });
       if (authErr) throw authErr;
-
       const { data: prof, error: profErr } = await supabase
         .from("profiles")
         .select("*")
@@ -1292,7 +1250,6 @@ function CbtMin4MagelangApp() {
         await supabase.auth.signOut();
         throw new Error(`Akun ini terdaftar sebagai ${prof.role}, bukan ${loginRoleTab}.`);
       }
-
       setFailedAttempts(0);
       setCurrentUser(prof);
       setIsSimulationMode(Boolean(prof.is_simulation));
@@ -1343,9 +1300,6 @@ function CbtMin4MagelangApp() {
     setActiveMenu("dashboard");
   };
 
-  // ==========================================================================
-  // TAMPILAN BELUM LOGIN (PORTAL AUTENTIKASI & SETUP ADMIN AWAL)
-  // ==========================================================================
   if (authLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-slate-50 text-slate-700 text-sm font-semibold">
@@ -1366,7 +1320,6 @@ function CbtMin4MagelangApp() {
               {schoolSettings.subtitle || "Sistem Ujian Digital Madrasah Ibtidaiyah"}
             </p>
           </div>
-
           {banner && (
             <div
               className={`px-5 py-3 text-xs font-semibold ${
@@ -1380,7 +1333,6 @@ function CbtMin4MagelangApp() {
               {banner.message}
             </div>
           )}
-
           <div className="p-6 space-y-5">
             {!hasProductionAdmin ? (
               <form onSubmit={handleInitialAdminSetup} className="space-y-3">
@@ -1465,7 +1417,6 @@ function CbtMin4MagelangApp() {
                     </button>
                   ))}
                 </div>
-
                 <form onSubmit={handleLoginSubmit} className="space-y-3">
                   <div>
                     <label className="block text-xs font-bold text-slate-700 mb-1">
@@ -1502,7 +1453,6 @@ function CbtMin4MagelangApp() {
                 </form>
               </>
             )}
-
             {loginRoleTab === "ADMIN" && (
               <div className="border-t border-slate-200 pt-4 space-y-2">
                 <div className="text-[11px] font-bold text-slate-500 text-center">
@@ -1522,7 +1472,6 @@ function CbtMin4MagelangApp() {
                 </div>
               </div>
             )}
-
             <div className="flex items-center justify-between text-[11px] text-slate-500 pt-1">
               <span>Supabase: {supabase ? "Terhubung" : "Belum Terhubung"}</span>
               <button
@@ -1535,7 +1484,6 @@ function CbtMin4MagelangApp() {
             </div>
           </div>
         </div>
-
         {showSchemaModal && (
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
             <div className="bg-white rounded-2xl max-w-2xl w-full p-5 space-y-3">
@@ -1575,9 +1523,6 @@ function CbtMin4MagelangApp() {
     );
   }
 
-  // ==========================================================================
-  // LAYOUT UTAMA TEROTENTIKASI (ADMIN / GURU / SISWA)
-  // ==========================================================================
   const userRole = currentUser.role || "SISWA";
   const allowedMenus = MENU_CONFIG[userRole] || MENU_CONFIG.SISWA;
   const isMenuAllowed = allowedMenus.some((m) => m.id === activeMenu);
@@ -1863,7 +1808,6 @@ function CbtMin4MagelangApp() {
             <X className="w-5 h-5" />
           </button>
         </div>
-
         <nav className="flex-1 overflow-y-auto p-3 space-y-1">
           {allowedMenus.map((item) => {
             const active = activeMenu === item.id;
@@ -1887,7 +1831,6 @@ function CbtMin4MagelangApp() {
             );
           })}
         </nav>
-
         <div className="p-3 border-t border-emerald-800 space-y-2">
           <div className="px-2 py-1.5 rounded-xl bg-emerald-950/60 text-[11px]">
             <div className="font-bold truncate">{currentUser.full_name}</div>
@@ -1903,7 +1846,6 @@ function CbtMin4MagelangApp() {
           </button>
         </div>
       </aside>
-
       <div className="flex-1 flex flex-col min-w-0">
         <header className="bg-white border-b border-slate-200 px-4 py-3 flex items-center justify-between gap-3">
           <div className="flex items-center gap-3">
@@ -1924,7 +1866,6 @@ function CbtMin4MagelangApp() {
               </p>
             </div>
           </div>
-
           <div className="flex items-center gap-2">
             {isSimulationMode ? (
               <span className="px-3 py-1 rounded-full bg-amber-100 border border-amber-300 text-amber-900 text-[11px] font-extrabold">
@@ -1937,28 +1878,25 @@ function CbtMin4MagelangApp() {
             )}
           </div>
         </header>
-
         {isSimulationMode && (
           <div className="bg-amber-50 border-b border-amber-200 px-4 py-2 text-xs text-amber-900 font-semibold">
             Perhatian: Anda berada di lingkungan pengujian SIMULASI. Seluruh data di sini terpisah
             dan diberi label SIMULASI pada file unduhan.
           </div>
         )}
-
         {banner && (
           <div
             className={`px-4 py-2.5 text-xs font-bold border-b ${
               banner.type === "error"
                 ? "bg-red-50 text-red-800 border-red-200"
                 : banner.type === "warning"
-                  ? "bg-amber-50 text-amber-900 border-amber-200"
+                  ? "bg-amber-50 text-amber-900 border-red-200"
                   : "bg-emerald-50 text-emerald-900 border-emerald-200"
             }`}
           >
             {banner.message}
           </div>
         )}
-
         <main className="flex-1 p-4 md:p-6 max-w-7xl w-full mx-auto space-y-5">
           {renderActiveContent()}
         </main>
@@ -1980,7 +1918,6 @@ function DashboardView({ user, isSimulation, schoolSettings, stats, onNavigate }
     { label: "Jadwal Ujian", value: stats.exams, menu: "exams", roles: ["ADMIN", "GURU"] },
     { label: "Hasil Ujian", value: stats.results, menu: "results", roles: ["ADMIN", "GURU"] }
   ].filter((c) => c.roles.includes(user.role));
-
   return (
     <div className="space-y-5">
       <div className="bg-white border border-slate-200 rounded-2xl p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -2017,7 +1954,6 @@ function DashboardView({ user, isSimulation, schoolSettings, stats, onNavigate }
           </button>
         )}
       </div>
-
       {cards.length > 0 && (
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
           {cards.map((c) => (
@@ -2036,7 +1972,6 @@ function DashboardView({ user, isSimulation, schoolSettings, stats, onNavigate }
           ))}
         </div>
       )}
-
       <div className="bg-white border border-slate-200 rounded-2xl p-5 space-y-2 text-xs text-slate-600">
         <div className="font-extrabold text-slate-900">
           Status Sistem {isSimulation ? "(Lingkungan Pengujian Simulasi)" : "(Produksi Madrasah)"}
@@ -2057,11 +1992,9 @@ function DashboardView({ user, isSimulation, schoolSettings, stats, onNavigate }
 // ============================================================================
 function SchoolIdentityView({ supabase, schoolSettings, onSaved, showBanner }) {
   const [form, setForm] = useState(schoolSettings);
-
   useEffect(() => {
     setForm(schoolSettings);
   }, [schoolSettings]);
-
   const handleLogoUpload = (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -2074,7 +2007,6 @@ function SchoolIdentityView({ supabase, schoolSettings, onSaved, showBanner }) {
     };
     reader.readAsDataURL(file);
   };
-
   const handleSave = async (e) => {
     e.preventDefault();
     if (!supabase) return showBanner("error", "Supabase belum terhubung.");
@@ -2091,7 +2023,6 @@ function SchoolIdentityView({ supabase, schoolSettings, onSaved, showBanner }) {
       showBanner("error", `Gagal menyimpan identitas: ${err.message}`);
     }
   };
-
   return (
     <form
       onSubmit={handleSave}
@@ -2216,14 +2147,13 @@ function SchoolIdentityView({ supabase, schoolSettings, onSaved, showBanner }) {
 }
 
 // ============================================================================
-// MODUL 3: MANAJEMEN KELAS, MAPEL, GURU & SISWA (TEMPLATE & IMPOR .CSV/.XLSX)
+// MODUL 3: MANAJEMEN KELAS, MAPEL, GURU & SISWA
 // ============================================================================
 function ClassesManagerView({ supabase, classesList, students, isSimulation, onRefresh, showBanner }) {
   const [name, setName] = useState("");
   const [grade, setGrade] = useState("1");
   const [search, setSearch] = useState("");
   const [importSummary, setImportSummary] = useState(null);
-
   const filtered = useMemo(
     () =>
       classesList.filter(
@@ -2233,7 +2163,6 @@ function ClassesManagerView({ supabase, classesList, students, isSimulation, onR
       ),
     [classesList, search]
   );
-
   const handleDownloadTemplate = async () => {
     await downloadXlsxTemplateFile("Template_Data_Kelas_MIN4.xlsx", "Data_Kelas", [
       { name: "1A", grade_level: "1" },
@@ -2241,7 +2170,6 @@ function ClassesManagerView({ supabase, classesList, students, isSimulation, onR
     ]);
     showBanner("success", "Template Data Kelas (.xlsx) berhasil diunduh.");
   };
-
   const handleImportFile = async (e) => {
     const file = e.target.files?.[0];
     e.target.value = "";
@@ -2251,7 +2179,6 @@ function ClassesManagerView({ supabase, classesList, students, isSimulation, onR
       const existingNames = new Set(classesList.map((c) => (c.name || "").toLowerCase()));
       const validPayloads = [];
       const errors = [];
-
       rawRows.forEach((raw, idx) => {
         const r = normalizeRowKeys(raw);
         const className = String(r.name || r.nama_kelas || "").trim();
@@ -2271,7 +2198,6 @@ function ClassesManagerView({ supabase, classesList, students, isSimulation, onR
           is_simulation: Boolean(isSimulation)
         });
       });
-
       let insertedCount = 0;
       if (validPayloads.length > 0) {
         const { error } = await supabase.from("classes").insert(validPayloads);
@@ -2293,7 +2219,6 @@ function ClassesManagerView({ supabase, classesList, students, isSimulation, onR
       showBanner("error", `Gagal mengimpor Data Kelas: ${err.message}`);
     }
   };
-
   const handleAdd = async (e) => {
     e.preventDefault();
     if (!supabase || !name.trim()) return;
@@ -2307,7 +2232,6 @@ function ClassesManagerView({ supabase, classesList, students, isSimulation, onR
     await onRefresh();
     showBanner("success", "Kelas berhasil ditambahkan.");
   };
-
   const handleDelete = async (cls) => {
     const hasStudents = students.some((s) => s.class_id === cls.id);
     if (hasStudents) {
@@ -2318,7 +2242,6 @@ function ClassesManagerView({ supabase, classesList, students, isSimulation, onR
     await onRefresh();
     showBanner("success", "Kelas dihapus.");
   };
-
   return (
     <div className="space-y-4">
       <form
@@ -2358,7 +2281,6 @@ function ClassesManagerView({ supabase, classesList, students, isSimulation, onR
           Tambah Kelas
         </button>
       </form>
-
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-2 bg-white border border-slate-200 rounded-xl px-3 py-2 max-w-sm flex-1">
           <Search className="w-4 h-4 text-slate-400" />
@@ -2391,7 +2313,6 @@ function ClassesManagerView({ supabase, classesList, students, isSimulation, onR
           </label>
         </div>
       </div>
-
       {importSummary && (
         <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3 text-xs space-y-1">
           <div className="font-extrabold text-emerald-900">
@@ -2407,7 +2328,6 @@ function ClassesManagerView({ supabase, classesList, students, isSimulation, onR
           )}
         </div>
       )}
-
       <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
         <table className="w-full text-xs">
           <thead className="bg-slate-50 border-b border-slate-200 text-slate-700 font-bold">
@@ -2459,7 +2379,6 @@ function SubjectsManagerView({ supabase, subjects, isSimulation, onRefresh, show
   const [name, setName] = useState("");
   const [search, setSearch] = useState("");
   const [importSummary, setImportSummary] = useState(null);
-
   const filtered = useMemo(
     () =>
       subjects.filter(
@@ -2469,7 +2388,6 @@ function SubjectsManagerView({ supabase, subjects, isSimulation, onRefresh, show
       ),
     [subjects, search]
   );
-
   const handleDownloadTemplate = async () => {
     await downloadXlsxTemplateFile("Template_Mata_Pelajaran_MIN4.xlsx", "Mata_Pelajaran", [
       { code: "MTK", name: "Matematika" },
@@ -2477,7 +2395,6 @@ function SubjectsManagerView({ supabase, subjects, isSimulation, onRefresh, show
     ]);
     showBanner("success", "Template Mata Pelajaran (.xlsx) berhasil diunduh.");
   };
-
   const handleImportFile = async (e) => {
     const file = e.target.files?.[0];
     e.target.value = "";
@@ -2487,7 +2404,6 @@ function SubjectsManagerView({ supabase, subjects, isSimulation, onRefresh, show
       const existingCodes = new Set(subjects.map((s) => (s.code || "").toLowerCase()));
       const validPayloads = [];
       const errors = [];
-
       rawRows.forEach((raw, idx) => {
         const r = normalizeRowKeys(raw);
         const subCode = String(r.code || r.kode || "").trim().toUpperCase();
@@ -2507,7 +2423,6 @@ function SubjectsManagerView({ supabase, subjects, isSimulation, onRefresh, show
           is_simulation: Boolean(isSimulation)
         });
       });
-
       let insertedCount = 0;
       if (validPayloads.length > 0) {
         const { error } = await supabase.from("subjects").insert(validPayloads);
@@ -2529,7 +2444,6 @@ function SubjectsManagerView({ supabase, subjects, isSimulation, onRefresh, show
       showBanner("error", `Gagal mengimpor Mata Pelajaran: ${err.message}`);
     }
   };
-
   const handleAdd = async (e) => {
     e.preventDefault();
     if (!supabase || !code.trim() || !name.trim()) return;
@@ -2548,14 +2462,12 @@ function SubjectsManagerView({ supabase, subjects, isSimulation, onRefresh, show
     await onRefresh();
     showBanner("success", "Mata pelajaran berhasil ditambahkan.");
   };
-
   const handleDelete = async (id) => {
     const { error } = await supabase.from("subjects").delete().eq("id", id);
     if (error) return showBanner("error", error.message);
     await onRefresh();
     showBanner("success", "Mata pelajaran dihapus.");
   };
-
   return (
     <div className="space-y-4">
       <form
@@ -2592,7 +2504,6 @@ function SubjectsManagerView({ supabase, subjects, isSimulation, onRefresh, show
           Tambah Mapel
         </button>
       </form>
-
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-2 bg-white border border-slate-200 rounded-xl px-3 py-2 max-w-sm flex-1">
           <Search className="w-4 h-4 text-slate-400" />
@@ -2625,7 +2536,6 @@ function SubjectsManagerView({ supabase, subjects, isSimulation, onRefresh, show
           </label>
         </div>
       </div>
-
       {importSummary && (
         <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3 text-xs space-y-1">
           <div className="font-extrabold text-emerald-900">
@@ -2641,7 +2551,6 @@ function SubjectsManagerView({ supabase, subjects, isSimulation, onRefresh, show
           )}
         </div>
       )}
-
       <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
         <table className="w-full text-xs">
           <thead className="bg-slate-50 border-b border-slate-200 text-slate-700 font-bold">
@@ -2689,7 +2598,6 @@ function TeachersManagerView({ supabase, teachers, subjects, isSimulation, onRef
   const [subjectId, setSubjectId] = useState("");
   const [search, setSearch] = useState("");
   const [importSummary, setImportSummary] = useState(null);
-
   const filtered = useMemo(
     () =>
       teachers.filter(
@@ -2700,7 +2608,6 @@ function TeachersManagerView({ supabase, teachers, subjects, isSimulation, onRef
       ),
     [teachers, search]
   );
-
   const handleDownloadTemplate = async () => {
     const sampleSubject = subjects[0]?.name || "Matematika";
     await downloadXlsxTemplateFile("Template_Data_Guru_MIN4.xlsx", "Data_Guru", [
@@ -2714,7 +2621,6 @@ function TeachersManagerView({ supabase, teachers, subjects, isSimulation, onRef
     ]);
     showBanner("success", "Template Data Guru (.xlsx) berhasil diunduh.");
   };
-
   const handleImportFile = async (e) => {
     const file = e.target.files?.[0];
     e.target.value = "";
@@ -2724,7 +2630,6 @@ function TeachersManagerView({ supabase, teachers, subjects, isSimulation, onRef
       const existingUsernames = new Set(teachers.map((t) => (t.username || "").toLowerCase()));
       const validPayloads = [];
       const errors = [];
-
       rawRows.forEach((raw, idx) => {
         const r = normalizeRowKeys(raw);
         const tName = String(r.full_name || r.nama || r.nama_guru || "").trim();
@@ -2769,7 +2674,6 @@ function TeachersManagerView({ supabase, teachers, subjects, isSimulation, onRef
           is_simulation: Boolean(isSimulation)
         });
       });
-
       let insertedCount = 0;
       if (validPayloads.length > 0) {
         const { error } = await supabase.from("teachers").insert(validPayloads);
@@ -2791,7 +2695,6 @@ function TeachersManagerView({ supabase, teachers, subjects, isSimulation, onRef
       showBanner("error", `Gagal mengimpor Data Guru: ${err.message}`);
     }
   };
-
   const handleAdd = async (e) => {
     e.preventDefault();
     if (!supabase || !fullName.trim() || !username.trim()) return;
@@ -2812,14 +2715,12 @@ function TeachersManagerView({ supabase, teachers, subjects, isSimulation, onRef
     await onRefresh();
     showBanner("success", "Data guru berhasil disimpan.");
   };
-
   const handleDelete = async (id) => {
     const { error } = await supabase.from("teachers").delete().eq("id", id);
     if (error) return showBanner("error", error.message);
     await onRefresh();
     showBanner("success", "Data guru dihapus.");
   };
-
   return (
     <div className="space-y-4">
       <form
@@ -2878,7 +2779,6 @@ function TeachersManagerView({ supabase, teachers, subjects, isSimulation, onRef
           Simpan Guru
         </button>
       </form>
-
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-2 bg-white border border-slate-200 rounded-xl px-3 py-2 max-w-sm flex-1">
           <Search className="w-4 h-4 text-slate-400" />
@@ -2911,7 +2811,6 @@ function TeachersManagerView({ supabase, teachers, subjects, isSimulation, onRef
           </label>
         </div>
       </div>
-
       {importSummary && (
         <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3 text-xs space-y-1">
           <div className="font-extrabold text-emerald-900">
@@ -2927,7 +2826,6 @@ function TeachersManagerView({ supabase, teachers, subjects, isSimulation, onRef
           )}
         </div>
       )}
-
       <div className="bg-white border border-slate-200 rounded-2xl overflow-x-auto">
         <table className="w-full text-xs">
           <thead className="bg-slate-50 border-b border-slate-200 text-slate-700 font-bold">
@@ -2986,7 +2884,6 @@ function StudentsManagerView({ supabase, students, classesList, isSimulation, on
   const [filterClass, setFilterClass] = useState("");
   const [importSummary, setImportSummary] = useState(null);
   const [lastCreatedCreds, setLastCreatedCreds] = useState(null);
-
   const filtered = useMemo(
     () =>
       students.filter((st) => {
@@ -3001,7 +2898,6 @@ function StudentsManagerView({ supabase, students, classesList, isSimulation, on
       }),
     [students, search, filterClass]
   );
-
   const handleDownloadTemplate = async () => {
     const sampleClass = classesList[0]?.name || "6A";
     await downloadXlsxTemplateFile("Template_Data_Siswa_MIN4.xlsx", "Data_Siswa", [
@@ -3017,7 +2913,6 @@ function StudentsManagerView({ supabase, students, classesList, isSimulation, on
     ]);
     showBanner("success", "Template Data Siswa (.xlsx) berhasil diunduh.");
   };
-
   const handleImportFile = async (e) => {
     const file = e.target.files?.[0];
     e.target.value = "";
@@ -3029,7 +2924,6 @@ function StudentsManagerView({ supabase, students, classesList, isSimulation, on
       );
       const validPayloads = [];
       const errors = [];
-
       rawRows.forEach((raw, idx) => {
         const r = normalizeRowKeys(raw);
         const stNis = String(r.nis || "").trim();
@@ -3072,7 +2966,6 @@ function StudentsManagerView({ supabase, students, classesList, isSimulation, on
           is_simulation: Boolean(isSimulation)
         });
       });
-
       let insertedCount = 0;
       if (validPayloads.length > 0) {
         const { error } = await supabase.from("students").insert(validPayloads);
@@ -3094,7 +2987,6 @@ function StudentsManagerView({ supabase, students, classesList, isSimulation, on
       showBanner("error", `Gagal mengimpor Data Siswa: ${err.message}`);
     }
   };
-
   const handleAdd = async (e) => {
     e.preventDefault();
     if (!supabase || !fullName.trim() || !classId) {
@@ -3136,14 +3028,12 @@ function StudentsManagerView({ supabase, students, classesList, isSimulation, on
       `Data & kredensial login siswa "${payload.full_name}" berhasil disimpan.`
     );
   };
-
   const handleDelete = async (id) => {
     const { error } = await supabase.from("students").delete().eq("id", id);
     if (error) return showBanner("error", error.message);
     await onRefresh();
     showBanner("success", "Data siswa dihapus.");
   };
-
   return (
     <div className="space-y-4">
       <form
@@ -3225,7 +3115,6 @@ function StudentsManagerView({ supabase, students, classesList, isSimulation, on
           </div>
         </div>
       </form>
-
       {lastCreatedCreds && (
         <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3 text-xs flex flex-wrap items-center justify-between gap-2">
           <div>
@@ -3244,7 +3133,6 @@ function StudentsManagerView({ supabase, students, classesList, isSimulation, on
           </button>
         </div>
       )}
-
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-wrap items-center gap-3">
           <div className="flex items-center gap-2 bg-white border border-slate-200 rounded-xl px-3 py-2 min-w-[220px]">
@@ -3291,7 +3179,6 @@ function StudentsManagerView({ supabase, students, classesList, isSimulation, on
           </label>
         </div>
       </div>
-
       {importSummary && (
         <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3 text-xs space-y-1">
           <div className="font-extrabold text-emerald-900">
@@ -3307,7 +3194,6 @@ function StudentsManagerView({ supabase, students, classesList, isSimulation, on
           )}
         </div>
       )}
-
       <div className="bg-white border border-slate-200 rounded-2xl overflow-x-auto">
         <table className="w-full text-xs">
           <thead className="bg-slate-50 border-b border-slate-200 text-slate-700 font-bold">
@@ -3360,8 +3246,32 @@ function StudentsManagerView({ supabase, students, classesList, isSimulation, on
 }
 
 // ============================================================================
-// MODUL 4: BANK SOAL (TEMPLATE, IMPOR .CSV/.XLSX & CETAK BERKOP RESMI)
+// MODUL 4: BANK SOAL (TAMBAH, EDIT, TEMPLATE, IMPOR & CETAK BERKOP RESMI)
 // ============================================================================
+function buildOptionsByType(qType, optA, optB, optC, optD) {
+  if (qType === "PG" || qType === "PG_KOMPLEKS") {
+    return [
+      { key: "A", text: optA },
+      { key: "B", text: optB },
+      { key: "C", text: optC },
+      { key: "D", text: optD }
+    ].filter((o) => String(o.text || "").trim() !== "");
+  }
+  if (qType === "BENAR_SALAH") {
+    return [
+      { key: "BENAR", text: "Benar" },
+      { key: "SALAH", text: "Salah" }
+    ];
+  }
+  if (qType === "TEPAT_TIDAK_TEPAT") {
+    return [
+      { key: "TEPAT", text: "Tepat" },
+      { key: "TIDAK_TEPAT", text: "Tidak Tepat" }
+    ];
+  }
+  return [];
+}
+
 function QuestionBankManagerView({
   supabase,
   questions,
@@ -3382,6 +3292,21 @@ function QuestionBankManagerView({
   const [optD, setOptD] = useState("");
   const [correctAnswer, setCorrectAnswer] = useState("A");
   const [weight, setWeight] = useState(1);
+
+  // State Modal Edit Soal
+  const [editingQuestion, setEditingQuestion] = useState(null);
+  const [editSubjectId, setEditSubjectId] = useState("");
+  const [editTopic, setEditTopic] = useState("");
+  const [editType, setEditType] = useState("PG");
+  const [editQuestionText, setEditQuestionText] = useState("");
+  const [editOptA, setEditOptA] = useState("");
+  const [editOptB, setEditOptB] = useState("");
+  const [editOptC, setEditOptC] = useState("");
+  const [editOptD, setEditOptD] = useState("");
+  const [editCorrectAnswer, setEditCorrectAnswer] = useState("");
+  const [editWeight, setEditWeight] = useState(1);
+  const [savingEdit, setSavingEdit] = useState(false);
+
   const [search, setSearch] = useState("");
   const [filterSubject, setFilterSubject] = useState("");
   const [importSummary, setImportSummary] = useState(null);
@@ -3398,6 +3323,60 @@ function QuestionBankManagerView({
       }),
     [questions, filterSubject, search]
   );
+
+  const openEditModal = (q) => {
+    const opts = Array.isArray(q.options) ? q.options : [];
+    const findOpt = (key) => opts.find((o) => String(o.key || "").toUpperCase() === key)?.text || "";
+    setEditingQuestion(q);
+    setEditSubjectId(q.subject_id || "");
+    setEditTopic(q.topic || "");
+    setEditType(q.type || "PG");
+    setEditQuestionText(q.question_text || "");
+    setEditOptA(findOpt("A"));
+    setEditOptB(findOpt("B"));
+    setEditOptC(findOpt("C"));
+    setEditOptD(findOpt("D"));
+    setEditCorrectAnswer(q.correct_answer || "");
+    setEditWeight(Number(q.weight) || 1);
+  };
+
+  const handleUpdateQuestion = async (e) => {
+    e.preventDefault();
+    if (!supabase || !editingQuestion) return;
+    if (!editQuestionText.trim() || !editCorrectAnswer.trim()) {
+      return showBanner("error", "Pertanyaan soal dan kunci jawaban wajib diisi.");
+    }
+    setSavingEdit(true);
+    try {
+      const updatedOptions = buildOptionsByType(
+        editType,
+        editOptA,
+        editOptB,
+        editOptC,
+        editOptD
+      );
+      const { error } = await supabase
+        .from("questions")
+        .update({
+          subject_id: editSubjectId || null,
+          topic: editTopic.trim(),
+          type: editType,
+          question_text: editQuestionText.trim(),
+          options: updatedOptions,
+          correct_answer: editCorrectAnswer.trim(),
+          weight: Number(editWeight) || 1
+        })
+        .eq("id", editingQuestion.id);
+      if (error) throw error;
+      setEditingQuestion(null);
+      await onRefresh();
+      showBanner("success", "Butir soal berhasil diperbarui.");
+    } catch (err) {
+      showBanner("error", `Gagal memperbarui soal: ${err.message}`);
+    } finally {
+      setSavingEdit(false);
+    }
+  };
 
   const handleDownloadQuestionTemplate = async () => {
     const sampleSubject = subjects[0]?.name || "Matematika";
@@ -3440,7 +3419,6 @@ function QuestionBankManagerView({
       const rawRows = await parseSpreadsheetFile(file);
       const validPayloads = [];
       const errors = [];
-
       rawRows.forEach((raw, idx) => {
         const r = normalizeRowKeys(raw);
         const rawSub = String(r.subject_id || r.mata_pelajaran || r.mapel || "").trim();
@@ -3481,20 +3459,14 @@ function QuestionBankManagerView({
             { key: "D", text: String(r.option_d || r.opsi_d || r.d || "").trim() }
           ].filter((o) => o.text !== "");
           if (opts.length < 2) {
-            errors.push(`Baris ${idx + 2}: soal ${rawType} minimal memiliki 2 opsi (option_a, option_b).`);
+            errors.push(
+              `Baris ${idx + 2}: soal ${rawType} minimal memiliki 2 opsi (option_a, option_b).`
+            );
             return;
           }
           optionsJson = opts;
-        } else if (rawType === "BENAR_SALAH") {
-          optionsJson = [
-            { key: "BENAR", text: "Benar" },
-            { key: "SALAH", text: "Salah" }
-          ];
-        } else if (rawType === "TEPAT_TIDAK_TEPAT") {
-          optionsJson = [
-            { key: "TEPAT", text: "Tepat" },
-            { key: "TIDAK_TEPAT", text: "Tidak Tepat" }
-          ];
+        } else {
+          optionsJson = buildOptionsByType(rawType, "", "", "", "");
         }
         validPayloads.push({
           subject_id: matchedSubjectId,
@@ -3508,7 +3480,6 @@ function QuestionBankManagerView({
           is_simulation: Boolean(isSimulation)
         });
       });
-
       let insertedCount = 0;
       if (validPayloads.length > 0) {
         const { error } = await supabase.from("questions").insert(validPayloads);
@@ -3534,26 +3505,7 @@ function QuestionBankManagerView({
   const handleSaveQuestion = async (e) => {
     e.preventDefault();
     if (!supabase || !questionText.trim()) return;
-    let options = [];
-    if (qType === "PG" || qType === "PG_KOMPLEKS") {
-      options = [
-        { key: "A", text: optA },
-        { key: "B", text: optB },
-        { key: "C", text: optC },
-        { key: "D", text: optD }
-      ].filter((o) => o.text.trim() !== "");
-    } else if (qType === "BENAR_SALAH") {
-      options = [
-        { key: "BENAR", text: "Benar" },
-        { key: "SALAH", text: "Salah" }
-      ];
-    } else if (qType === "TEPAT_TIDAK_TEPAT") {
-      options = [
-        { key: "TEPAT", text: "Tepat" },
-        { key: "TIDAK_TEPAT", text: "Tidak Tepat" }
-      ];
-    }
-
+    const options = buildOptionsByType(qType, optA, optB, optC, optD);
     const { error } = await supabase.from("questions").insert([
       {
         subject_id: subjectId || null,
@@ -3669,7 +3621,6 @@ function QuestionBankManagerView({
             </button>
           </div>
         </div>
-
         {importSummary && (
           <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3 text-xs space-y-1">
             <div className="font-extrabold text-emerald-900">
@@ -3685,7 +3636,6 @@ function QuestionBankManagerView({
             )}
           </div>
         )}
-
         <form onSubmit={handleSaveQuestion} className="space-y-3">
           <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
             <div>
@@ -3738,7 +3688,6 @@ function QuestionBankManagerView({
               />
             </div>
           </div>
-
           <div>
             <label className="block text-xs font-bold text-slate-700 mb-1">Pertanyaan Soal</label>
             <textarea
@@ -3749,7 +3698,6 @@ function QuestionBankManagerView({
               className="w-full border border-slate-300 rounded-xl px-3 py-2 text-xs"
             />
           </div>
-
           {(qType === "PG" || qType === "PG_KOMPLEKS") && (
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
               <input
@@ -3782,7 +3730,6 @@ function QuestionBankManagerView({
               />
             </div>
           )}
-
           <div className="flex flex-wrap items-end gap-3">
             <div className="flex-1 min-w-[200px]">
               <label className="block text-xs font-bold text-slate-700 mb-1">
@@ -3839,35 +3786,209 @@ function QuestionBankManagerView({
         ) : (
           filteredQuestions.map((q, idx) => {
             const sub = subjects.find((s) => s.id === q.subject_id);
+            const opts = Array.isArray(q.options) ? q.options : [];
             return (
               <div
                 key={q.id}
                 className="bg-white border border-slate-200 rounded-2xl p-4 flex items-start justify-between gap-4"
               >
-                <div className="space-y-1 text-xs">
+                <div className="space-y-1.5 text-xs flex-1">
                   <div className="flex flex-wrap items-center gap-2">
                     <span className="font-extrabold text-emerald-800">#{idx + 1}</span>
                     <span className="px-2 py-0.5 rounded bg-slate-100 font-bold">{q.type}</span>
                     <span className="text-slate-500">{sub?.name || "Umum"}</span>
+                    {q.topic && <span className="text-slate-500">• Topik: {q.topic}</span>}
                     <span className="text-slate-500">• Bobot: {q.weight}</span>
                   </div>
-                  <p className="font-semibold text-slate-900">{q.question_text}</p>
-                  <div className="text-[11px] font-bold text-emerald-700">
+                  <p className="font-semibold text-slate-900 whitespace-pre-line">
+                    {q.question_text}
+                  </p>
+                  {opts.length > 0 && (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-1 pt-1 text-[11px] text-slate-700">
+                      {opts.map((o) => (
+                        <div key={o.key} className="bg-slate-50 px-2.5 py-1 rounded-lg">
+                          <strong>{o.key}.</strong> {o.text}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  <div className="text-[11px] font-bold text-emerald-700 pt-0.5">
                     Kunci Jawaban: {q.correct_answer}
                   </div>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => handleDelete(q.id)}
-                  className="text-red-600 hover:text-red-800 p-1"
-                >
-                  <Trash2 className="w-4 h-4" />
-                </button>
+                <div className="flex items-center gap-1.5 shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => openEditModal(q)}
+                    className="px-2.5 py-1.5 rounded-xl border border-emerald-200 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 text-xs font-bold inline-flex items-center gap-1"
+                    title="Edit Soal"
+                  >
+                    <Pencil className="w-3.5 h-3.5" />
+                    Edit
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleDelete(q.id)}
+                    className="text-red-600 hover:text-red-800 p-1.5 rounded-xl hover:bg-red-50"
+                    title="Hapus Soal"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </div>
               </div>
             );
           })
         )}
       </div>
+
+      {/* MODAL EDIT SOAL */}
+      {editingQuestion && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50 overflow-y-auto">
+          <div className="bg-white rounded-2xl max-w-2xl w-full p-5 space-y-4 shadow-lg my-auto">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div>
+                <h3 className="text-sm font-extrabold text-slate-900">Edit Butir Soal</h3>
+                <p className="text-[11px] text-slate-500">
+                  Perubahan akan langsung disimpan ke tabel questions di Supabase.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setEditingQuestion(null)}
+                className="p-1 text-slate-500 hover:text-slate-800"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <form onSubmit={handleUpdateQuestion} className="space-y-3 text-xs">
+              <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">Mata Pelajaran</label>
+                  <select
+                    value={editSubjectId}
+                    onChange={(e) => setEditSubjectId(e.target.value)}
+                    className="w-full border border-slate-300 rounded-xl px-3 py-2"
+                  >
+                    <option value="">-- Pilih Mapel --</option>
+                    {subjects.map((s) => (
+                      <option key={s.id} value={s.id}>
+                        {s.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">Materi / Topik</label>
+                  <input
+                    type="text"
+                    value={editTopic}
+                    onChange={(e) => setEditTopic(e.target.value)}
+                    className="w-full border border-slate-300 rounded-xl px-3 py-2"
+                  />
+                </div>
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">Jenis Soal</label>
+                  <select
+                    value={editType}
+                    onChange={(e) => setEditType(e.target.value)}
+                    className="w-full border border-slate-300 rounded-xl px-3 py-2"
+                  >
+                    <option value="PG">Pilihan Ganda (PG)</option>
+                    <option value="ESSAY">Uraian / Essay (ESSAY)</option>
+                    <option value="PG_KOMPLEKS">Pilihan Ganda Kompleks</option>
+                    <option value="BENAR_SALAH">Benar / Salah</option>
+                    <option value="TEPAT_TIDAK_TEPAT">Tepat / Tidak Tepat</option>
+                    <option value="ISIAN_SINGKAT">Isian Singkat</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">Bobot Nilai</label>
+                  <input
+                    type="number"
+                    min="1"
+                    value={editWeight}
+                    onChange={(e) => setEditWeight(e.target.value)}
+                    className="w-full border border-slate-300 rounded-xl px-3 py-2"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block font-bold text-slate-700 mb-1">Pertanyaan Soal</label>
+                <textarea
+                  required
+                  rows={3}
+                  value={editQuestionText}
+                  onChange={(e) => setEditQuestionText(e.target.value)}
+                  className="w-full border border-slate-300 rounded-xl px-3 py-2"
+                />
+              </div>
+
+              {(editType === "PG" || editType === "PG_KOMPLEKS") && (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  <input
+                    type="text"
+                    placeholder="Opsi A"
+                    value={editOptA}
+                    onChange={(e) => setEditOptA(e.target.value)}
+                    className="border border-slate-300 rounded-xl px-3 py-2"
+                  />
+                  <input
+                    type="text"
+                    placeholder="Opsi B"
+                    value={editOptB}
+                    onChange={(e) => setEditOptB(e.target.value)}
+                    className="border border-slate-300 rounded-xl px-3 py-2"
+                  />
+                  <input
+                    type="text"
+                    placeholder="Opsi C"
+                    value={editOptC}
+                    onChange={(e) => setEditOptC(e.target.value)}
+                    className="border border-slate-300 rounded-xl px-3 py-2"
+                  />
+                  <input
+                    type="text"
+                    placeholder="Opsi D"
+                    value={editOptD}
+                    onChange={(e) => setEditOptD(e.target.value)}
+                    className="border border-slate-300 rounded-xl px-3 py-2"
+                  />
+                </div>
+              )}
+
+              <div>
+                <label className="block font-bold text-slate-700 mb-1">Kunci Jawaban</label>
+                <input
+                  type="text"
+                  required
+                  value={editCorrectAnswer}
+                  onChange={(e) => setEditCorrectAnswer(e.target.value)}
+                  className="w-full border border-slate-300 rounded-xl px-3 py-2"
+                />
+              </div>
+
+              <div className="flex justify-end gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setEditingQuestion(null)}
+                  className="px-4 py-2 rounded-xl border border-slate-300 font-bold text-slate-700"
+                >
+                  Batal
+                </button>
+                <button
+                  type="submit"
+                  disabled={savingEdit}
+                  className="px-4 py-2 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white font-extrabold disabled:opacity-50"
+                >
+                  {savingEdit ? "Menyimpan..." : "Simpan Perubahan"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -3899,18 +4020,15 @@ function ExamsManagerView({
     "Berdoalah sebelum mengerjakan ujian. Pilihlah jawaban yang paling tepat."
   );
   const [selectedQuestionIds, setSelectedQuestionIds] = useState([]);
-
   const availableQuestions = useMemo(
     () => questions.filter((q) => !subjectId || q.subject_id === subjectId),
     [questions, subjectId]
   );
-
   const toggleQuestionSelect = (id) => {
     setSelectedQuestionIds((prev) =>
       prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]
     );
   };
-
   const handleCreateExam = async (e) => {
     e.preventDefault();
     if (!supabase) return;
@@ -3939,7 +4057,6 @@ function ExamsManagerView({
     await onRefresh();
     showBanner("success", "Paket jadwal ujian berhasil dibuat.");
   };
-
   const handlePrintNaskahSoal = (exam) => {
     const qIds = Array.isArray(exam.question_ids) ? exam.question_ids : [];
     const examQuestions = qIds
@@ -3979,7 +4096,10 @@ function ExamsManagerView({
         { label: "Mata Pelajaran", value: sub?.name || "-" },
         { label: "Kelas", value: cls?.name || "Semua Kelas" },
         { label: "Hari / Tanggal", value: exam.exam_date || "-" },
-        { label: "Waktu / Durasi", value: `${exam.start_time} - ${exam.end_time} (${exam.duration_minutes} Menit)` },
+        {
+          label: "Waktu / Durasi",
+          value: `${exam.start_time} - ${exam.end_time} (${exam.duration_minutes} Menit)`
+        },
         { label: "Nama Peserta", value: "...................................................................." },
         { label: "Nomor Peserta", value: "...................................................................." }
       ],
@@ -3991,7 +4111,6 @@ function ExamsManagerView({
     });
     openPrintDocumentWindow(html);
   };
-
   return (
     <div className="space-y-4">
       <form
@@ -4079,7 +4198,6 @@ function ExamsManagerView({
             />
           </div>
         </div>
-
         <div className="space-y-1.5">
           <div className="text-xs font-bold text-slate-700">
             Pilih Butir Soal dari Bank Soal ({selectedQuestionIds.length} terpilih):
@@ -4107,7 +4225,6 @@ function ExamsManagerView({
             )}
           </div>
         </div>
-
         <button
           type="submit"
           className="px-4 py-2.5 rounded-xl bg-emerald-700 text-white text-xs font-extrabold"
@@ -4115,7 +4232,6 @@ function ExamsManagerView({
           Simpan & Terbitkan Jadwal Ujian
         </button>
       </form>
-
       <div className="bg-white border border-slate-200 rounded-2xl overflow-x-auto">
         <table className="w-full text-xs">
           <thead className="bg-slate-50 border-b border-slate-200 font-bold text-slate-700">
@@ -4186,12 +4302,10 @@ function ParticipantsManagerView({
 }) {
   const [selectedExamId, setSelectedExamId] = useState("");
   const [selectedClassId, setSelectedClassId] = useState("");
-
   const examParticipants = useMemo(
     () => participants.filter((p) => p.exam_id === selectedExamId),
     [participants, selectedExamId]
   );
-
   const handleAssignByClass = async () => {
     if (!supabase || !selectedExamId || !selectedClassId) {
       return showBanner("error", "Pilih paket ujian dan kelas terlebih dahulu.");
@@ -4221,7 +4335,6 @@ function ParticipantsManagerView({
     await onRefresh();
     showBanner("success", `${payloads.length} peserta berhasil ditambahkan ke ujian.`);
   };
-
   const handlePrintDaftarPeserta = () => {
     const exam = exams.find((e) => e.id === selectedExamId);
     if (!exam || examParticipants.length === 0) {
@@ -4271,7 +4384,6 @@ function ParticipantsManagerView({
     });
     openPrintDocumentWindow(html);
   };
-
   const handleExportParticipantsExcel = async () => {
     const exam = exams.find((e) => e.id === selectedExamId);
     if (!exam || examParticipants.length === 0) {
@@ -4300,7 +4412,6 @@ function ParticipantsManagerView({
       isSimulation
     });
   };
-
   return (
     <div className="space-y-4">
       <div className="bg-white border border-slate-200 rounded-2xl p-4 grid grid-cols-1 sm:grid-cols-3 gap-3 items-end">
@@ -4344,7 +4455,6 @@ function ParticipantsManagerView({
           Tetapkan Peserta Kelas
         </button>
       </div>
-
       {selectedExamId && (
         <div className="flex flex-wrap gap-2 justify-end">
           <button
@@ -4365,7 +4475,6 @@ function ParticipantsManagerView({
           </button>
         </div>
       )}
-
       <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
         <table className="w-full text-xs">
           <thead className="bg-slate-50 border-b border-slate-200 font-bold text-slate-700">
@@ -4431,7 +4540,6 @@ function StudentExamPortalView({
   const [flaggedMap, setFlaggedMap] = useState({});
   const [secondsLeft, setSecondsLeft] = useState(0);
   const [confirmFinishOpen, setConfirmFinishOpen] = useState(false);
-
   const myExams = useMemo(() => {
     if (isSimulation) return exams.filter((e) => e.status === "AKTIF");
     const myPartExamIds = new Set(
@@ -4446,13 +4554,11 @@ function StudentExamPortalView({
     );
     return exams.filter((e) => myPartExamIds.has(e.id));
   }, [exams, participants, currentUser, isSimulation]);
-
   const activeQuestions = useMemo(() => {
     if (!activeExam) return [];
     const qIds = Array.isArray(activeExam.question_ids) ? activeExam.question_ids : [];
     return qIds.map((id) => questions.find((q) => q.id === id)).filter(Boolean);
   }, [activeExam, questions]);
-
   useEffect(() => {
     if (!activeExam) return;
     const interval = setInterval(() => {
@@ -4467,7 +4573,6 @@ function StudentExamPortalView({
     }, 1000);
     return () => clearInterval(interval);
   }, [activeExam]);
-
   const handleStartExam = (exam) => {
     const storageKey = `cbt_min4_ans_${exam.id}_${currentUser.id}`;
     const savedLocal = localStorage.getItem(storageKey);
@@ -4484,7 +4589,6 @@ function StudentExamPortalView({
     setSecondsLeft((Number(exam.duration_minutes) || 60) * 60);
     setActiveExam(exam);
   };
-
   const handleSelectAnswer = async (questionId, value) => {
     const updated = { ...answersMap, [questionId]: value };
     setAnswersMap(updated);
@@ -4506,7 +4610,6 @@ function StudentExamPortalView({
       }
     }
   };
-
   const handleSubmitExam = async (isAuto = false) => {
     if (!activeExam) return;
     setConfirmFinishOpen(false);
@@ -4521,19 +4624,16 @@ function StudentExamPortalView({
           is_simulation: Boolean(isSimulation)
         }
       ]);
-
       const { data: fullQuestions } = await supabase
         .from("questions")
         .select("*")
         .in("id", activeExam.question_ids || []);
-
       if (Array.isArray(fullQuestions) && fullQuestions.length > 0) {
         let totalWeight = 0;
         let earnedWeight = 0;
         let correctCount = 0;
         let wrongCount = 0;
         let emptyCount = 0;
-
         fullQuestions.forEach((q) => {
           const ev = evaluateSingleQuestionAnswer(q, answersMap[q.id], gradingFormula);
           totalWeight += ev.maxWeight;
@@ -4542,12 +4642,10 @@ function StudentExamPortalView({
           else if (ev.status === "EMPTY") emptyCount++;
           else wrongCount++;
         });
-
         const finalScore =
           totalWeight > 0
             ? Number(((earnedWeight / totalWeight) * (gradingFormula.max_score || 100)).toFixed(2))
             : 0;
-
         await supabase.from("exam_results").upsert({
           id: `${activeExam.id}_${currentUser.id}`,
           exam_id: activeExam.id,
@@ -4573,12 +4671,10 @@ function StudentExamPortalView({
         : "Ujian berhasil diselesaikan dan jawaban tersimpan."
     );
   };
-
   if (activeExam) {
     const q = activeQuestions[currentIndex];
     const mins = Math.floor(secondsLeft / 60);
     const secs = secondsLeft % 60;
-
     return (
       <div className="space-y-4">
         <div className="bg-white border border-slate-200 rounded-2xl p-4 flex flex-wrap items-center justify-between gap-3">
@@ -4593,7 +4689,6 @@ function StudentExamPortalView({
             {String(mins).padStart(2, "0")}:{String(secs).padStart(2, "0")}
           </div>
         </div>
-
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
           <div className="lg:col-span-3 bg-white border border-slate-200 rounded-2xl p-5 space-y-4">
             {q ? (
@@ -4637,7 +4732,6 @@ function StudentExamPortalView({
             ) : (
               <div className="text-xs text-slate-500">Soal tidak tersedia.</div>
             )}
-
             <div className="flex flex-wrap items-center justify-between gap-2 pt-3 border-t border-slate-100">
               <button
                 type="button"
@@ -4684,7 +4778,6 @@ function StudentExamPortalView({
               )}
             </div>
           </div>
-
           <div className="bg-white border border-slate-200 rounded-2xl p-4 space-y-3">
             <div className="text-xs font-extrabold text-slate-800">Navigasi Nomor Soal</div>
             <div className="grid grid-cols-5 gap-2">
@@ -4697,9 +4790,7 @@ function StudentExamPortalView({
                     type="button"
                     onClick={() => setCurrentIndex(idx)}
                     className={`py-2 rounded-lg text-xs font-extrabold border ${
-                      idx === currentIndex
-                        ? "ring-2 ring-emerald-600 border-emerald-700"
-                        : ""
+                      idx === currentIndex ? "ring-2 ring-emerald-600 border-emerald-700" : ""
                     } ${
                       flagged
                         ? "bg-amber-200 border-amber-400 text-amber-950"
@@ -4715,7 +4806,6 @@ function StudentExamPortalView({
             </div>
           </div>
         </div>
-
         {confirmFinishOpen && (
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
             <div className="bg-white rounded-2xl max-w-md w-full p-5 space-y-3">
@@ -4746,7 +4836,6 @@ function StudentExamPortalView({
       </div>
     );
   }
-
   if (mode === "student_history") {
     const myResults = examResults.filter((r) => r.student_id === currentUser.id);
     return (
@@ -4782,7 +4871,6 @@ function StudentExamPortalView({
       </div>
     );
   }
-
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
       {myExams.length === 0 ? (
@@ -4847,7 +4935,6 @@ function ResultsAndGradingView({
 }) {
   const [selectedExamId, setSelectedExamId] = useState("");
   const [formulaForm, setFormulaForm] = useState(gradingFormula);
-
   const filteredResults = useMemo(
     () =>
       selectedExamId
@@ -4855,7 +4942,6 @@ function ResultsAndGradingView({
         : examResults,
     [examResults, selectedExamId]
   );
-
   const handleRecalculateExam = async () => {
     if (!supabase || !selectedExamId) {
       return showBanner("error", "Pilih paket ujian yang akan dihitung ulang.");
@@ -4867,7 +4953,6 @@ function ResultsAndGradingView({
       .filter(Boolean);
     const examAns = studentAnswers.filter((a) => a.exam_id === selectedExamId);
     const studentIds = [...new Set(examAns.map((a) => a.student_id))];
-
     for (const stId of studentIds) {
       let totalW = 0;
       let earnedW = 0;
@@ -4907,7 +4992,6 @@ function ResultsAndGradingView({
     await onRefresh();
     showBanner("success", "Perhitungan ulang nilai selesai berdasarkan kunci & rumus terbaru.");
   };
-
   return (
     <div className="space-y-4">
       <div className="bg-white border border-slate-200 rounded-2xl p-4 grid grid-cols-1 sm:grid-cols-4 gap-3 items-end">
@@ -4950,7 +5034,6 @@ function ResultsAndGradingView({
           Simpan Rumus Nilai
         </button>
       </div>
-
       <div className="flex flex-wrap items-center justify-between gap-3">
         <select
           value={selectedExamId}
@@ -4975,7 +5058,6 @@ function ResultsAndGradingView({
           </button>
         )}
       </div>
-
       <div className="bg-white border border-slate-200 rounded-2xl overflow-x-auto">
         <table className="w-full text-xs">
           <thead className="bg-slate-50 border-b border-slate-200 font-bold text-slate-700">
@@ -5044,7 +5126,6 @@ function ItemAnalysisView({
   showBanner
 }) {
   const [selectedExamId, setSelectedExamId] = useState("");
-
   const analysisRows = useMemo(() => {
     if (!selectedExamId) return [];
     const exam = exams.find((e) => e.id === selectedExamId);
@@ -5060,7 +5141,6 @@ function ItemAnalysisView({
     const lowerIds = new Set(
       groupSize > 0 ? results.slice(totalParticipants - groupSize).map((r) => r.student_id) : []
     );
-
     return examQs.map((q, idx) => {
       let correct = 0;
       let wrong = 0;
@@ -5068,7 +5148,10 @@ function ItemAnalysisView({
       let lowerCorrect = 0;
       results.forEach((res) => {
         const ans = studentAnswers.find(
-          (a) => a.exam_id === selectedExamId && a.student_id === res.student_id && a.question_id === q.id
+          (a) =>
+            a.exam_id === selectedExamId &&
+            a.student_id === res.student_id &&
+            a.question_id === q.id
         );
         const ev = evaluateSingleQuestionAnswer(q, ans?.answer);
         if (ev.status === "CORRECT") {
@@ -5112,7 +5195,6 @@ function ItemAnalysisView({
       };
     });
   }, [selectedExamId, exams, questions, studentAnswers, examResults]);
-
   const handlePrintAnalysis = () => {
     const exam = exams.find((e) => e.id === selectedExamId);
     if (!exam || analysisRows.length === 0) {
@@ -5165,7 +5247,6 @@ function ItemAnalysisView({
     });
     openPrintDocumentWindow(html);
   };
-
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -5192,7 +5273,6 @@ function ItemAnalysisView({
           </button>
         )}
       </div>
-
       <div className="bg-white border border-slate-200 rounded-2xl overflow-x-auto">
         <table className="w-full text-xs">
           <thead className="bg-slate-50 border-b border-slate-200 font-bold text-slate-700">
@@ -5250,7 +5330,6 @@ function OfficialReportsView({
   showBanner
 }) {
   const [selectedExamId, setSelectedExamId] = useState("");
-
   const rows = useMemo(
     () =>
       (selectedExamId
@@ -5272,7 +5351,6 @@ function OfficialReportsView({
       }),
     [examResults, selectedExamId, students, classesList]
   );
-
   const stats = useMemo(() => {
     if (rows.length === 0) return { max: 0, min: 0, avg: 0 };
     const scores = rows.map((r) => r.nilai);
@@ -5282,7 +5360,6 @@ function OfficialReportsView({
       avg: Number((scores.reduce((a, b) => a + b, 0) / scores.length).toFixed(2))
     };
   }, [rows]);
-
   const buildReportHtml = () => {
     const exam = exams.find((e) => e.id === selectedExamId);
     const sub = exam ? subjects.find((s) => s.id === exam.subject_id) : null;
@@ -5336,17 +5413,14 @@ function OfficialReportsView({
       isSimulation
     });
   };
-
   const handlePrintPdf = () => {
     if (rows.length === 0) return showBanner("error", "Belum ada data nilai untuk dicetak.");
     openPrintDocumentWindow(buildReportHtml());
   };
-
   const handleDownloadWord = () => {
     if (rows.length === 0) return showBanner("error", "Belum ada data nilai untuk diunduh.");
     downloadWordDocFile("Laporan_Hasil_Ujian_MIN4.doc", buildReportHtml());
   };
-
   const handleDownloadExcel = async () => {
     if (rows.length === 0) return showBanner("error", "Belum ada data nilai untuk diunduh.");
     await exportOfficialExcelWithKop({
@@ -5369,7 +5443,6 @@ function OfficialReportsView({
       isSimulation
     });
   };
-
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -5412,7 +5485,6 @@ function OfficialReportsView({
           </button>
         </div>
       </div>
-
       <div className="grid grid-cols-3 gap-3">
         <div className="bg-white border border-slate-200 rounded-2xl p-3 text-center">
           <div className="text-[11px] text-slate-500 font-bold">Nilai Tertinggi</div>
@@ -5427,7 +5499,6 @@ function OfficialReportsView({
           <div className="text-lg font-extrabold text-slate-900">{stats.avg}</div>
         </div>
       </div>
-
       <div className="bg-white border border-slate-200 rounded-2xl overflow-x-auto">
         <table className="w-full text-xs">
           <thead className="bg-slate-50 border-b border-slate-200 font-bold text-slate-700">
@@ -5476,11 +5547,9 @@ function DocumentSettingsView({
   showBanner
 }) {
   const [form, setForm] = useState(documentSettings);
-
   useEffect(() => {
     setForm(documentSettings);
   }, [documentSettings]);
-
   const handleUploadKop = (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -5491,7 +5560,6 @@ function DocumentSettingsView({
     };
     reader.readAsDataURL(file);
   };
-
   const handleTestPrint = () => {
     const html = buildOfficialDocumentHtml({
       title: "UJI CETAK TEMPLATE DOKUMEN RESMI",
@@ -5511,7 +5579,6 @@ function DocumentSettingsView({
     });
     openPrintDocumentWindow(html);
   };
-
   return (
     <div className="bg-white border border-slate-200 rounded-2xl p-5 space-y-5 shadow-sm">
       <div className="flex flex-wrap items-center justify-between gap-2">
@@ -5542,7 +5609,6 @@ function DocumentSettingsView({
           </button>
         </div>
       </div>
-
       <div className="border border-slate-200 rounded-2xl p-4 bg-slate-50 space-y-3">
         <div className="text-xs font-bold text-slate-700">Preview Kop Surat Resmi Aktif:</div>
         <div className="bg-white border border-slate-200 rounded-xl p-3">
@@ -5567,7 +5633,6 @@ function DocumentSettingsView({
           </button>
         </div>
       </div>
-
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs">
         <label className="flex items-center gap-2 font-bold">
           <input
@@ -5654,7 +5719,6 @@ function BackupDataView({ isSimulation, payload, showBanner }) {
     URL.revokeObjectURL(url);
     showBanner("success", "Berkas cadangan database (JSON) berhasil diunduh.");
   };
-
   return (
     <div className="bg-white border border-slate-200 rounded-2xl p-5 space-y-4">
       <h2 className="text-sm font-extrabold text-slate-900">Cadangan Database (Backup JSON)</h2>
@@ -5691,7 +5755,6 @@ function AdminSettingsView({
   const [newEmail, setNewEmail] = useState("");
   const [newPass, setNewPass] = useState("");
   const [newRole, setNewRole] = useState("GURU");
-
   const handleCreateAccount = async (e) => {
     e.preventDefault();
     if (!supabase) return;
@@ -5727,7 +5790,6 @@ function AdminSettingsView({
       showBanner("error", `Gagal membuat akun: ${err.message}`);
     }
   };
-
   return (
     <div className="space-y-5">
       <div className="bg-white border border-slate-200 rounded-2xl p-5 space-y-3">
@@ -5760,7 +5822,6 @@ function AdminSettingsView({
           Perbarui Koneksi Supabase
         </button>
       </div>
-
       <form
         onSubmit={handleCreateAccount}
         className="bg-white border border-slate-200 rounded-2xl p-5 space-y-3"
@@ -5819,7 +5880,6 @@ function AdminSettingsView({
           </div>
         </div>
       </form>
-
       <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
         <table className="w-full text-xs">
           <thead className="bg-slate-50 border-b border-slate-200 font-bold text-slate-700">
