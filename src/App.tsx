@@ -37,6 +37,7 @@ import {
   Copy,
   Pencil
 } from "lucide-react";
+
 // ============================================================================
 // KLIEN SUPABASE REST & AUTH (TANPA DEPENDENSI BUNDLER EKSTERNAL)
 // ============================================================================
@@ -53,6 +54,7 @@ class SupabaseRestQueryBuilder {
     this.preferHeaders = [];
     this.singleMode = null;
   }
+
   getHeaders(extra = {}) {
     const token =
       !this.isPublicLookup && this.sessionTokenRef?.current?.access_token
@@ -65,6 +67,7 @@ class SupabaseRestQueryBuilder {
       ...extra
     };
   }
+
   select(columns = "*") {
     if (this.method === "GET") {
       this.queryParams.push(`select=${encodeURIComponent(columns)}`);
@@ -73,16 +76,19 @@ class SupabaseRestQueryBuilder {
     }
     return this;
   }
+
   eq(col, val) {
     this.queryParams.push(`${encodeURIComponent(col)}=eq.${encodeURIComponent(String(val))}`);
     return this;
   }
+
   in(col, vals) {
     const arr = Array.isArray(vals) ? vals : [];
     const formatted = arr.map((v) => `"${String(v).replace(/"/g, "")}"`).join(",");
     this.queryParams.push(`${encodeURIComponent(col)}=in.(${encodeURIComponent(formatted)})`);
     return this;
   }
+
   or(filterStr) {
     const parts = String(filterStr || "")
       .split(",")
@@ -100,48 +106,57 @@ class SupabaseRestQueryBuilder {
     }
     return this;
   }
+
   order(col, opts = {}) {
     const dir = opts.ascending === false ? "desc" : "asc";
     this.queryParams.push(`order=${encodeURIComponent(col)}.${dir}`);
     return this;
   }
+
   limit(n) {
     this.queryParams.push(`limit=${Number(n) || 10}`);
     return this;
   }
+
   insert(rows) {
     this.method = "POST";
     this.bodyData = Array.isArray(rows) ? rows : [rows];
     this.preferHeaders.push("return=representation");
     return this;
   }
+
   update(values) {
     this.method = "PATCH";
     this.bodyData = values;
     this.preferHeaders.push("return=representation");
     return this;
   }
+
   upsert(rowOrRows) {
     this.method = "POST";
     this.bodyData = Array.isArray(rowOrRows) ? rowOrRows : [rowOrRows];
     this.preferHeaders.push("resolution=merge-duplicates", "return=representation");
     return this;
   }
+
   delete() {
     this.method = "DELETE";
     this.preferHeaders.push("return=representation");
     return this;
   }
+
   maybeSingle() {
     this.singleMode = "maybeSingle";
     this.limit(1);
     return this;
   }
+
   single() {
     this.singleMode = "single";
     this.limit(1);
     return this;
   }
+
   async execute() {
     try {
       const qs = this.queryParams.length > 0 ? `?${this.queryParams.join("&")}` : "";
@@ -180,10 +195,12 @@ class SupabaseRestQueryBuilder {
       return { data: null, error: { message: err?.message || "Kesalahan jaringan Supabase." } };
     }
   }
+
   then(resolve, reject) {
     return this.execute().then(resolve, reject);
   }
 }
+
 function createSupabaseClient(url, anonKey, options = {}) {
   const cleanUrl = String(url || "").trim().replace(/\/+$/, "");
   const cleanKey = String(anonKey || "").trim();
@@ -201,6 +218,7 @@ function createSupabaseClient(url, anonKey, options = {}) {
         })()
       : null
   };
+
   const saveSession = (sess) => {
     sessionRef.current = sess;
     if (persist) {
@@ -212,6 +230,7 @@ function createSupabaseClient(url, anonKey, options = {}) {
       }
     }
   };
+
   return {
     from(table) {
       const publicLookup = table === "profiles" && !sessionRef.current?.access_token;
@@ -295,12 +314,14 @@ function createSupabaseClient(url, anonKey, options = {}) {
     }
   };
 }
+
 // ============================================================================
 // KONFIGURASI SUPABASE & TEMPLATE DOKUMEN TERPUSAT MIN 4 MAGELANG
 // ============================================================================
 const DEFAULT_SUPABASE_URL = "https://qlyajgeyuyjbjvsmcdjj.supabase.co";
 const DEFAULT_SUPABASE_ANON_KEY = "sb_publishable_Xpj_iUpn2C-hA0QlKOLmLg_GnXTJZ6k";
 const DEFAULT_KOP_IMAGE_SRC = "/image_3fe900.png";
+
 const DEFAULT_SCHOOL_SETTINGS = {
   school_name: "MIN 4 MAGELANG",
   app_name: "CBT MIN 4 MAGELANG",
@@ -316,6 +337,7 @@ const DEFAULT_SCHOOL_SETTINGS = {
   email: "min.mlangen@gmail.com",
   logo_base64: ""
 };
+
 const DEFAULT_DOCUMENT_SETTINGS = {
   kop_image: DEFAULT_KOP_IMAGE_SRC,
   use_kop_pdf: true,
@@ -332,6 +354,7 @@ const DEFAULT_DOCUMENT_SETTINGS = {
   show_page_number: true,
   show_print_date: true
 };
+
 const DEFAULT_GRADING_FORMULA = {
   pg_kompleks_mode: "PROPORTIONAL",
   isian_mode: "CASE_INSENSITIVE",
@@ -339,6 +362,7 @@ const DEFAULT_GRADING_FORMULA = {
   max_score: 100,
   kkm: 75
 };
+
 const SQL_SCHEMA_SCRIPT = `-- Jalankan di SQL Editor Supabase
 create extension if not exists "pgcrypto";
 create table if not exists public.school_settings (id text primary key, data jsonb not null default '{}'::jsonb, updated_at timestamptz not null default now());
@@ -353,6 +377,7 @@ create table if not exists public.exam_participants (id uuid primary key default
 create table if not exists public.exam_attempts (id uuid primary key default gen_random_uuid(), exam_id uuid references public.exams(id) on delete cascade, student_id text not null, student_name text not null, answers jsonb not null default '{}'::jsonb, status text not null default 'SELESAI', is_simulation boolean not null default false, submitted_at timestamptz not null default now());
 create table if not exists public.student_answers (id text primary key, exam_id uuid references public.exams(id) on delete cascade, student_id text not null, question_id uuid references public.questions(id) on delete cascade, answer text, is_simulation boolean not null default false, updated_at timestamptz not null default now());
 create table if not exists public.exam_results (id text primary key, exam_id uuid references public.exams(id) on delete cascade, exam_title text, student_id text not null, student_name text not null, score numeric not null default 0, correct_count integer not null default 0, wrong_count integer not null default 0, empty_count integer not null default 0, is_simulation boolean not null default false, updated_at timestamptz not null default now());`;
+
 const MENU_CONFIG = {
   ADMIN: [
     { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -386,6 +411,7 @@ const MENU_CONFIG = {
     { id: "student_history", label: "Riwayat & Nilai", icon: History }
   ]
 };
+
 // ============================================================================
 // UTILITAS SPREADSHEET (.XLSX / .CSV), EXCELJS & TEMPLATE DOKUMEN TERPUSAT
 // ============================================================================
@@ -409,6 +435,7 @@ const loadExternalScript = (src) =>
     script.onerror = () => reject(new Error(`Gagal memuat ${src}`));
     document.head.appendChild(script);
   });
+
 const ensureXlsxLoaded = async () => {
   if (typeof window !== "undefined" && window.XLSX) {
     return window.XLSX?.default || window.XLSX;
@@ -416,6 +443,7 @@ const ensureXlsxLoaded = async () => {
   await loadExternalScript("https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js");
   return window.XLSX?.default || window.XLSX;
 };
+
 const ensureExcelJsLoaded = async () => {
   if (typeof window !== "undefined" && window.ExcelJS) {
     return window.ExcelJS?.default || window.ExcelJS;
@@ -423,6 +451,7 @@ const ensureExcelJsLoaded = async () => {
   await loadExternalScript("https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js");
   return window.ExcelJS?.default || window.ExcelJS;
 };
+
 const downloadXlsxTemplateFile = async (filename, sheetName, sampleRows) => {
   const XLSX = await ensureXlsxLoaded();
   const ws = XLSX.utils.json_to_sheet(sampleRows);
@@ -430,6 +459,7 @@ const downloadXlsxTemplateFile = async (filename, sheetName, sampleRows) => {
   XLSX.utils.book_append_sheet(wb, ws, sheetName);
   XLSX.writeFile(wb, filename.endsWith(".xlsx") ? filename : `${filename}.xlsx`);
 };
+
 const parseSpreadsheetFile = async (file) => {
   const XLSX = await ensureXlsxLoaded();
   const buffer = await file.arrayBuffer();
@@ -437,6 +467,7 @@ const parseSpreadsheetFile = async (file) => {
   const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
   return XLSX.utils.sheet_to_json(firstSheet, { defval: "" });
 };
+
 const normalizeRowKeys = (row) => {
   const out = {};
   Object.entries(row || {}).forEach(([k, v]) => {
@@ -445,18 +476,21 @@ const normalizeRowKeys = (row) => {
   });
   return out;
 };
+
 const escapeHtml = (str) =>
   String(str ?? "")
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;");
+
 const getFormattedPrintDate = () =>
   new Date().toLocaleDateString("id-ID", {
     day: "2-digit",
     month: "long",
     year: "numeric"
   });
+
 const buildOfficialDocumentHtml = ({
   title,
   subtitle = "",
@@ -484,6 +518,7 @@ const buildOfficialDocumentHtml = ({
           </tbody>
         </table>`
       : "";
+
   const signatureHtml = includeSignature
     ? `<div class="signature-grid">
         <div></div>
@@ -496,6 +531,7 @@ const buildOfficialDocumentHtml = ({
         </div>
       </div>`
     : "";
+
   return `<!DOCTYPE html>
 <html lang="id">
 <head>
@@ -647,6 +683,7 @@ const buildOfficialDocumentHtml = ({
 </body>
 </html>`;
 };
+
 const openPrintDocumentWindow = (htmlContent) => {
   if (typeof window === "undefined") return false;
   const win = window.open("", "_blank", "width=960,height=760");
@@ -660,6 +697,7 @@ const openPrintDocumentWindow = (htmlContent) => {
   }, 450);
   return true;
 };
+
 const downloadWordDocFile = (filename, htmlContent) => {
   const blob = new Blob(["\ufeff", htmlContent], { type: "application/msword;charset=utf-8" });
   const url = URL.createObjectURL(blob);
@@ -671,6 +709,7 @@ const downloadWordDocFile = (filename, htmlContent) => {
   document.body.removeChild(a);
   URL.revokeObjectURL(url);
 };
+
 const fetchImageAsBase64 = async (src) => {
   if (!src) return null;
   if (src.startsWith("data:image/")) return src;
@@ -686,6 +725,7 @@ const fetchImageAsBase64 = async (src) => {
     return null;
   }
 };
+
 const exportOfficialExcelWithKop = async ({
   filename,
   sheetName = "Laporan",
@@ -710,6 +750,7 @@ const exportOfficialExcelWithKop = async ({
   });
   const colCount = Math.max(columns.length, 4);
   ws.columns = columns.map((c) => ({ header: "", key: c.key, width: c.width || 18 }));
+
   let currentRow = 1;
   if (cfg.use_kop_excel) {
     const base64Img = await fetchImageAsBase64(cfg.kop_image || DEFAULT_KOP_IMAGE_SRC);
@@ -726,6 +767,7 @@ const exportOfficialExcelWithKop = async ({
       currentRow = 7;
     }
   }
+
   if (isSimulation) {
     ws.mergeCells(currentRow, 1, currentRow, colCount);
     const simCell = ws.getCell(currentRow, 1);
@@ -734,12 +776,14 @@ const exportOfficialExcelWithKop = async ({
     simCell.alignment = { horizontal: "center" };
     currentRow++;
   }
+
   ws.mergeCells(currentRow, 1, currentRow, colCount);
   const titleCell = ws.getCell(currentRow, 1);
   titleCell.value = title;
   titleCell.font = { bold: true, size: 13 };
   titleCell.alignment = { horizontal: "center" };
   currentRow++;
+
   if (subtitle) {
     ws.mergeCells(currentRow, 1, currentRow, colCount);
     const subCell = ws.getCell(currentRow, 1);
@@ -748,6 +792,7 @@ const exportOfficialExcelWithKop = async ({
     subCell.alignment = { horizontal: "center" };
     currentRow++;
   }
+
   currentRow++;
   const headerRowIndex = currentRow;
   const headerRow = ws.getRow(headerRowIndex);
@@ -767,6 +812,7 @@ const exportOfficialExcelWithKop = async ({
   headerRow.height = 24;
   ws.pageSetup.printTitlesRow = `${headerRowIndex}:${headerRowIndex}`;
   currentRow++;
+
   rows.forEach((rowObj) => {
     const r = ws.getRow(currentRow);
     columns.forEach((col, i) => {
@@ -782,6 +828,7 @@ const exportOfficialExcelWithKop = async ({
     });
     currentRow++;
   });
+
   const buffer = await workbook.xlsx.writeBuffer();
   const blob = new Blob([buffer], {
     type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
@@ -796,6 +843,7 @@ const exportOfficialExcelWithKop = async ({
   document.body.removeChild(a);
   URL.revokeObjectURL(url);
 };
+
 // ============================================================================
 // MESIN KOREKSI OTOMATIS & EVALUASI NILAI
 // ============================================================================
@@ -854,6 +902,7 @@ const evaluateSingleQuestionAnswer = (question, studentAnswer, formula = DEFAULT
   const ok = rawAns.toLowerCase() === rawKey.toLowerCase();
   return { status: ok ? "CORRECT" : "WRONG", earnedWeight: ok ? maxWeight : 0, maxWeight };
 };
+
 // ============================================================================
 // KOMPONEN ERROR BOUNDARY & HELPER UI
 // ============================================================================
@@ -886,10 +935,12 @@ class ErrorBoundary extends React.Component {
     return this.props.children;
   }
 }
+
 const renderSafeIcon = (IconComp, className = "w-4 h-4") => {
   if (!IconComp) return null;
   return <IconComp className={className} />;
 };
+
 function AccessDeniedView({ role, onBack }) {
   return (
     <div className="bg-white border border-red-200 rounded-2xl p-8 text-center space-y-3">
@@ -908,6 +959,7 @@ function AccessDeniedView({ role, onBack }) {
     </div>
   );
 }
+
 // ============================================================================
 // KOMPONEN UTAMA APLIKASI CBT MIN 4 MAGELANG
 // ============================================================================
@@ -919,6 +971,7 @@ function CbtMin4MagelangApp() {
     () => localStorage.getItem("cbt_min4_sb_key") || DEFAULT_SUPABASE_ANON_KEY
   );
   const [showSchemaModal, setShowSchemaModal] = useState(false);
+
   const supabase = useMemo(() => {
     if (!supabaseUrl || !supabaseKey) return null;
     try {
@@ -929,6 +982,7 @@ function CbtMin4MagelangApp() {
       return null;
     }
   }, [supabaseUrl, supabaseKey]);
+
   const [currentUser, setCurrentUser] = useState(null);
   const [isSimulationMode, setIsSimulationMode] = useState(false);
   const [hasProductionAdmin, setHasProductionAdmin] = useState(true);
@@ -938,16 +992,20 @@ function CbtMin4MagelangApp() {
   const [loginPassword, setLoginPassword] = useState("");
   const [failedAttempts, setFailedAttempts] = useState(0);
   const [lockoutUntil, setLockoutUntil] = useState(0);
+
   const [setupName, setSetupName] = useState("");
   const [setupUsername, setSetupUsername] = useState("");
   const [setupEmail, setSetupEmail] = useState("");
   const [setupPassword, setSetupPassword] = useState("");
+
   const [activeMenu, setActiveMenu] = useState("dashboard");
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [banner, setBanner] = useState(null);
+
   const [schoolSettings, setSchoolSettings] = useState(DEFAULT_SCHOOL_SETTINGS);
   const [documentSettings, setDocumentSettings] = useState(DEFAULT_DOCUMENT_SETTINGS);
   const [gradingFormula, setGradingFormula] = useState(DEFAULT_GRADING_FORMULA);
+
   const [profilesList, setProfilesList] = useState([]);
   const [classesList, setClassesList] = useState([]);
   const [subjects, setSubjects] = useState([]);
@@ -959,12 +1017,14 @@ function CbtMin4MagelangApp() {
   const [attempts, setAttempts] = useState([]);
   const [studentAnswers, setStudentAnswers] = useState([]);
   const [examResults, setExamResults] = useState([]);
+
   const showBanner = (type, message) => {
     setBanner({ type, message });
     setTimeout(() => {
       setBanner((prev) => (prev?.message === message ? null : prev));
     }, 6000);
   };
+
   useEffect(() => {
     let mounted = true;
     const initAuthAndAdminCheck = async () => {
@@ -1006,6 +1066,7 @@ function CbtMin4MagelangApp() {
       mounted = false;
     };
   }, [supabase]);
+
   const refreshAllData = async () => {
     if (!supabase) return;
     try {
@@ -1080,12 +1141,14 @@ function CbtMin4MagelangApp() {
       console.error("Refresh data error:", err);
     }
   };
+
   useEffect(() => {
     refreshAllData();
     if (!currentUser || !supabase) return;
     const timer = setInterval(refreshAllData, 15000);
     return () => clearInterval(timer);
   }, [supabase, currentUser, isSimulationMode]);
+
   const handleInitialAdminSetup = async (e) => {
     e.preventDefault();
     if (!supabase) return showBanner("error", "Koneksi Supabase belum terkonfigurasi.");
@@ -1126,6 +1189,7 @@ function CbtMin4MagelangApp() {
       showBanner("error", `Setup Administrator gagal: ${err.message}`);
     }
   };
+
   const handleLoginSubmit = async (e) => {
     e.preventDefault();
     if (!supabase) return showBanner("error", "Koneksi Supabase belum terkonfigurasi.");
@@ -1193,6 +1257,7 @@ function CbtMin4MagelangApp() {
         showBanner("success", `Selamat datang, ${matchedStudent.full_name} (SISWA).`);
         return;
       }
+
       let targetEmail = rawId;
       if (!rawId.includes("@")) {
         const { data: foundProf } = await supabase
@@ -1241,6 +1306,7 @@ function CbtMin4MagelangApp() {
       showBanner("error", `Login gagal: ${err.message}`);
     }
   };
+
   const handleLogout = async () => {
     if (supabase && !isSimulationMode) {
       await supabase.auth.signOut();
@@ -1251,6 +1317,7 @@ function CbtMin4MagelangApp() {
     setLoginPassword("");
     setActiveMenu("dashboard");
   };
+
   if (authLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-slate-50 text-slate-700 text-sm font-semibold">
@@ -1258,6 +1325,7 @@ function CbtMin4MagelangApp() {
       </div>
     );
   }
+
   if (!currentUser) {
     return (
       <div className="min-h-screen bg-slate-100 flex flex-col justify-center items-center p-4">
@@ -1482,9 +1550,11 @@ function CbtMin4MagelangApp() {
       </div>
     );
   }
+
   const userRole = currentUser.role || "SISWA";
   const allowedMenus = MENU_CONFIG[userRole] || MENU_CONFIG.SISWA;
   const isMenuAllowed = allowedMenus.some((m) => m.id === activeMenu);
+
   const renderActiveContent = () => {
     if (!isMenuAllowed) {
       return <AccessDeniedView role={userRole} onBack={() => setActiveMenu("dashboard")} />;
@@ -1745,6 +1815,7 @@ function CbtMin4MagelangApp() {
         return null;
     }
   };
+
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col md:flex-row">
       <aside
@@ -1863,6 +1934,7 @@ function CbtMin4MagelangApp() {
     </div>
   );
 }
+
 // ============================================================================
 // MODUL 1: DASHBOARD UTAMA (ZERO MOCK DATA)
 // ============================================================================
@@ -1876,6 +1948,7 @@ function DashboardView({ user, isSimulation, schoolSettings, stats, onNavigate }
     { label: "Jadwal Ujian", value: stats.exams, menu: "exams", roles: ["ADMIN", "GURU"] },
     { label: "Hasil Ujian", value: stats.results, menu: "results", roles: ["ADMIN", "GURU"] }
   ].filter((c) => c.roles.includes(user.role));
+
   return (
     <div className="space-y-5">
       <div className="bg-white border border-slate-200 rounded-2xl p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -1944,6 +2017,7 @@ function DashboardView({ user, isSimulation, schoolSettings, stats, onNavigate }
     </div>
   );
 }
+
 // ============================================================================
 // MODUL 2: IDENTITAS MADRASAH
 // ============================================================================
@@ -1952,6 +2026,7 @@ function SchoolIdentityView({ supabase, schoolSettings, onSaved, showBanner }) {
   useEffect(() => {
     setForm(schoolSettings);
   }, [schoolSettings]);
+
   const handleLogoUpload = (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -1964,6 +2039,7 @@ function SchoolIdentityView({ supabase, schoolSettings, onSaved, showBanner }) {
     };
     reader.readAsDataURL(file);
   };
+
   const handleSave = async (e) => {
     e.preventDefault();
     if (!supabase) return showBanner("error", "Supabase belum terhubung.");
@@ -1980,6 +2056,7 @@ function SchoolIdentityView({ supabase, schoolSettings, onSaved, showBanner }) {
       showBanner("error", `Gagal menyimpan identitas: ${err.message}`);
     }
   };
+
   return (
     <form
       onSubmit={handleSave}
@@ -2102,6 +2179,7 @@ function SchoolIdentityView({ supabase, schoolSettings, onSaved, showBanner }) {
     </form>
   );
 }
+
 // ============================================================================
 // MODUL 3: MANAJEMEN KELAS, MAPEL, GURU & SISWA
 // ============================================================================
@@ -2110,6 +2188,7 @@ function ClassesManagerView({ supabase, classesList, students, isSimulation, onR
   const [grade, setGrade] = useState("1");
   const [search, setSearch] = useState("");
   const [importSummary, setImportSummary] = useState(null);
+
   const filtered = useMemo(
     () =>
       classesList.filter(
@@ -2119,6 +2198,7 @@ function ClassesManagerView({ supabase, classesList, students, isSimulation, onR
       ),
     [classesList, search]
   );
+
   const handleDownloadTemplate = async () => {
     await downloadXlsxTemplateFile("Template_Data_Kelas_MIN4.xlsx", "Data_Kelas", [
       { name: "1A", grade_level: "1" },
@@ -2126,6 +2206,7 @@ function ClassesManagerView({ supabase, classesList, students, isSimulation, onR
     ]);
     showBanner("success", "Template Data Kelas (.xlsx) berhasil diunduh.");
   };
+
   const handleImportFile = async (e) => {
     const file = e.target.files?.[0];
     e.target.value = "";
@@ -2175,6 +2256,7 @@ function ClassesManagerView({ supabase, classesList, students, isSimulation, onR
       showBanner("error", `Gagal mengimpor Data Kelas: ${err.message}`);
     }
   };
+
   const handleAdd = async (e) => {
     e.preventDefault();
     if (!supabase || !name.trim()) return;
@@ -2188,6 +2270,7 @@ function ClassesManagerView({ supabase, classesList, students, isSimulation, onR
     await onRefresh();
     showBanner("success", "Kelas berhasil ditambahkan.");
   };
+
   const handleDelete = async (cls) => {
     const hasStudents = students.some((s) => s.class_id === cls.id);
     if (hasStudents) {
@@ -2198,6 +2281,7 @@ function ClassesManagerView({ supabase, classesList, students, isSimulation, onR
     await onRefresh();
     showBanner("success", "Kelas dihapus.");
   };
+
   return (
     <div className="space-y-4">
       <form
@@ -2237,6 +2321,7 @@ function ClassesManagerView({ supabase, classesList, students, isSimulation, onR
           Tambah Kelas
         </button>
       </form>
+
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-2 bg-white border border-slate-200 rounded-xl px-3 py-2 max-w-sm flex-1">
           <Search className="w-4 h-4 text-slate-400" />
@@ -2269,6 +2354,7 @@ function ClassesManagerView({ supabase, classesList, students, isSimulation, onR
           </label>
         </div>
       </div>
+
       {importSummary && (
         <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3 text-xs space-y-1">
           <div className="font-extrabold text-emerald-900">
@@ -2284,6 +2370,7 @@ function ClassesManagerView({ supabase, classesList, students, isSimulation, onR
           )}
         </div>
       )}
+
       <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
         <table className="w-full text-xs">
           <thead className="bg-slate-50 border-b border-slate-200 text-slate-700 font-bold">
@@ -2329,11 +2416,13 @@ function ClassesManagerView({ supabase, classesList, students, isSimulation, onR
     </div>
   );
 }
+
 function SubjectsManagerView({ supabase, subjects, isSimulation, onRefresh, showBanner }) {
   const [code, setCode] = useState("");
   const [name, setName] = useState("");
   const [search, setSearch] = useState("");
   const [importSummary, setImportSummary] = useState(null);
+
   const filtered = useMemo(
     () =>
       subjects.filter(
@@ -2343,6 +2432,7 @@ function SubjectsManagerView({ supabase, subjects, isSimulation, onRefresh, show
       ),
     [subjects, search]
   );
+
   const handleDownloadTemplate = async () => {
     await downloadXlsxTemplateFile("Template_Mata_Pelajaran_MIN4.xlsx", "Mata_Pelajaran", [
       { code: "MTK", name: "Matematika" },
@@ -2350,6 +2440,7 @@ function SubjectsManagerView({ supabase, subjects, isSimulation, onRefresh, show
     ]);
     showBanner("success", "Template Mata Pelajaran (.xlsx) berhasil diunduh.");
   };
+
   const handleImportFile = async (e) => {
     const file = e.target.files?.[0];
     e.target.value = "";
@@ -2399,6 +2490,7 @@ function SubjectsManagerView({ supabase, subjects, isSimulation, onRefresh, show
       showBanner("error", `Gagal mengimpor Mata Pelajaran: ${err.message}`);
     }
   };
+
   const handleAdd = async (e) => {
     e.preventDefault();
     if (!supabase || !code.trim() || !name.trim()) return;
@@ -2417,12 +2509,14 @@ function SubjectsManagerView({ supabase, subjects, isSimulation, onRefresh, show
     await onRefresh();
     showBanner("success", "Mata pelajaran berhasil ditambahkan.");
   };
+
   const handleDelete = async (id) => {
     const { error } = await supabase.from("subjects").delete().eq("id", id);
     if (error) return showBanner("error", error.message);
     await onRefresh();
     showBanner("success", "Mata pelajaran dihapus.");
   };
+
   return (
     <div className="space-y-4">
       <form
@@ -2459,6 +2553,7 @@ function SubjectsManagerView({ supabase, subjects, isSimulation, onRefresh, show
           Tambah Mapel
         </button>
       </form>
+
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-2 bg-white border border-slate-200 rounded-xl px-3 py-2 max-w-sm flex-1">
           <Search className="w-4 h-4 text-slate-400" />
@@ -2491,6 +2586,7 @@ function SubjectsManagerView({ supabase, subjects, isSimulation, onRefresh, show
           </label>
         </div>
       </div>
+
       {importSummary && (
         <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3 text-xs space-y-1">
           <div className="font-extrabold text-emerald-900">
@@ -2506,6 +2602,7 @@ function SubjectsManagerView({ supabase, subjects, isSimulation, onRefresh, show
           )}
         </div>
       )}
+
       <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
         <table className="w-full text-xs">
           <thead className="bg-slate-50 border-b border-slate-200 text-slate-700 font-bold">
@@ -2545,6 +2642,7 @@ function SubjectsManagerView({ supabase, subjects, isSimulation, onRefresh, show
     </div>
   );
 }
+
 function TeachersManagerView({ supabase, teachers, subjects, isSimulation, onRefresh, showBanner }) {
   const [fullName, setFullName] = useState("");
   const [nip, setNip] = useState("");
@@ -2552,6 +2650,7 @@ function TeachersManagerView({ supabase, teachers, subjects, isSimulation, onRef
   const [subjectId, setSubjectId] = useState("");
   const [search, setSearch] = useState("");
   const [importSummary, setImportSummary] = useState(null);
+
   const filtered = useMemo(
     () =>
       teachers.filter(
@@ -2562,6 +2661,7 @@ function TeachersManagerView({ supabase, teachers, subjects, isSimulation, onRef
       ),
     [teachers, search]
   );
+
   const handleDownloadTemplate = async () => {
     const sampleSubject = subjects[0]?.name || "Matematika";
     await downloadXlsxTemplateFile("Template_Data_Guru_MIN4.xlsx", "Data_Guru", [
@@ -2575,6 +2675,7 @@ function TeachersManagerView({ supabase, teachers, subjects, isSimulation, onRef
     ]);
     showBanner("success", "Template Data Guru (.xlsx) berhasil diunduh.");
   };
+
   const handleImportFile = async (e) => {
     const file = e.target.files?.[0];
     e.target.value = "";
@@ -2649,6 +2750,7 @@ function TeachersManagerView({ supabase, teachers, subjects, isSimulation, onRef
       showBanner("error", `Gagal mengimpor Data Guru: ${err.message}`);
     }
   };
+
   const handleAdd = async (e) => {
     e.preventDefault();
     if (!supabase || !fullName.trim() || !username.trim()) return;
@@ -2669,12 +2771,14 @@ function TeachersManagerView({ supabase, teachers, subjects, isSimulation, onRef
     await onRefresh();
     showBanner("success", "Data guru berhasil disimpan.");
   };
+
   const handleDelete = async (id) => {
     const { error } = await supabase.from("teachers").delete().eq("id", id);
     if (error) return showBanner("error", error.message);
     await onRefresh();
     showBanner("success", "Data guru dihapus.");
   };
+
   return (
     <div className="space-y-4">
       <form
@@ -2733,6 +2837,7 @@ function TeachersManagerView({ supabase, teachers, subjects, isSimulation, onRef
           Simpan Guru
         </button>
       </form>
+
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-2 bg-white border border-slate-200 rounded-xl px-3 py-2 max-w-sm flex-1">
           <Search className="w-4 h-4 text-slate-400" />
@@ -2765,6 +2870,7 @@ function TeachersManagerView({ supabase, teachers, subjects, isSimulation, onRef
           </label>
         </div>
       </div>
+
       {importSummary && (
         <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3 text-xs space-y-1">
           <div className="font-extrabold text-emerald-900">
@@ -2780,6 +2886,7 @@ function TeachersManagerView({ supabase, teachers, subjects, isSimulation, onRef
           )}
         </div>
       )}
+
       <div className="bg-white border border-slate-200 rounded-2xl overflow-x-auto">
         <table className="w-full text-xs">
           <thead className="bg-slate-50 border-b border-slate-200 text-slate-700 font-bold">
@@ -2826,6 +2933,7 @@ function TeachersManagerView({ supabase, teachers, subjects, isSimulation, onRef
     </div>
   );
 }
+
 function StudentsManagerView({ supabase, students, classesList, isSimulation, onRefresh, showBanner }) {
   const [nis, setNis] = useState("");
   const [nisn, setNisn] = useState("");
@@ -2837,6 +2945,7 @@ function StudentsManagerView({ supabase, students, classesList, isSimulation, on
   const [filterClass, setFilterClass] = useState("");
   const [importSummary, setImportSummary] = useState(null);
   const [lastCreatedCreds, setLastCreatedCreds] = useState(null);
+
   const filtered = useMemo(
     () =>
       students.filter((st) => {
@@ -2851,6 +2960,7 @@ function StudentsManagerView({ supabase, students, classesList, isSimulation, on
       }),
     [students, search, filterClass]
   );
+
   const handleDownloadTemplate = async () => {
     const sampleClass = classesList[0]?.name || "6A";
     await downloadXlsxTemplateFile("Template_Data_Siswa_MIN4.xlsx", "Data_Siswa", [
@@ -2866,6 +2976,7 @@ function StudentsManagerView({ supabase, students, classesList, isSimulation, on
     ]);
     showBanner("success", "Template Data Siswa (.xlsx) berhasil diunduh.");
   };
+
   const handleImportFile = async (e) => {
     const file = e.target.files?.[0];
     e.target.value = "";
@@ -2940,6 +3051,7 @@ function StudentsManagerView({ supabase, students, classesList, isSimulation, on
       showBanner("error", `Gagal mengimpor Data Siswa: ${err.message}`);
     }
   };
+
   const handleAdd = async (e) => {
     e.preventDefault();
     if (!supabase || !fullName.trim() || !classId) {
@@ -2981,12 +3093,14 @@ function StudentsManagerView({ supabase, students, classesList, isSimulation, on
       `Data & kredensial login siswa "${payload.full_name}" berhasil disimpan.`
     );
   };
+
   const handleDelete = async (id) => {
     const { error } = await supabase.from("students").delete().eq("id", id);
     if (error) return showBanner("error", error.message);
     await onRefresh();
     showBanner("success", "Data siswa dihapus.");
   };
+
   return (
     <div className="space-y-4">
       <form
@@ -3068,6 +3182,7 @@ function StudentsManagerView({ supabase, students, classesList, isSimulation, on
           </div>
         </div>
       </form>
+
       {lastCreatedCreds && (
         <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3 text-xs flex flex-wrap items-center justify-between gap-2">
           <div>
@@ -3086,6 +3201,7 @@ function StudentsManagerView({ supabase, students, classesList, isSimulation, on
           </button>
         </div>
       )}
+
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-wrap items-center gap-3">
           <div className="flex items-center gap-2 bg-white border border-slate-200 rounded-xl px-3 py-2 min-w-[220px]">
@@ -3132,6 +3248,7 @@ function StudentsManagerView({ supabase, students, classesList, isSimulation, on
           </label>
         </div>
       </div>
+
       {importSummary && (
         <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3 text-xs space-y-1">
           <div className="font-extrabold text-emerald-900">
@@ -3147,6 +3264,7 @@ function StudentsManagerView({ supabase, students, classesList, isSimulation, on
           )}
         </div>
       )}
+
       <div className="bg-white border border-slate-200 rounded-2xl overflow-x-auto">
         <table className="w-full text-xs">
           <thead className="bg-slate-50 border-b border-slate-200 text-slate-700 font-bold">
@@ -3197,16 +3315,18 @@ function StudentsManagerView({ supabase, students, classesList, isSimulation, on
     </div>
   );
 }
+
 // ============================================================================
 // MODUL 4: BANK SOAL (TAMBAH, EDIT, TEMPLATE, IMPOR & CETAK BERKOP RESMI)
 // ============================================================================
-function buildOptionsByType(qType, optA, optB, optC, optD) {
+function buildOptionsByType(qType, optA, optB, optC, optD, optE = "") {
   if (qType === "PG" || qType === "PG_KOMPLEKS") {
     return [
       { key: "A", text: optA },
       { key: "B", text: optB },
       { key: "C", text: optC },
-      { key: "D", text: optD }
+      { key: "D", text: optD },
+      { key: "E", text: optE }
     ].filter((o) => String(o.text || "").trim() !== "");
   }
   if (qType === "BENAR_SALAH") {
@@ -3223,6 +3343,7 @@ function buildOptionsByType(qType, optA, optB, optC, optD) {
   }
   return [];
 }
+
 function QuestionBankManagerView({
   supabase,
   questions,
@@ -3241,8 +3362,10 @@ function QuestionBankManagerView({
   const [optB, setOptB] = useState("");
   const [optC, setOptC] = useState("");
   const [optD, setOptD] = useState("");
+  const [optE, setOptE] = useState("");
   const [correctAnswer, setCorrectAnswer] = useState("A");
   const [weight, setWeight] = useState(1);
+
   const [editingQuestion, setEditingQuestion] = useState(null);
   const [editSubjectId, setEditSubjectId] = useState("");
   const [editTopic, setEditTopic] = useState("");
@@ -3252,12 +3375,15 @@ function QuestionBankManagerView({
   const [editOptB, setEditOptB] = useState("");
   const [editOptC, setEditOptC] = useState("");
   const [editOptD, setEditOptD] = useState("");
+  const [editOptE, setEditOptE] = useState("");
   const [editCorrectAnswer, setEditCorrectAnswer] = useState("");
   const [editWeight, setEditWeight] = useState(1);
   const [savingEdit, setSavingEdit] = useState(false);
+
   const [search, setSearch] = useState("");
   const [filterSubject, setFilterSubject] = useState("");
   const [importSummary, setImportSummary] = useState(null);
+
   const filteredQuestions = useMemo(
     () =>
       questions.filter((q) => {
@@ -3270,6 +3396,7 @@ function QuestionBankManagerView({
       }),
     [questions, filterSubject, search]
   );
+
   const openEditModal = (q) => {
     const opts = Array.isArray(q.options) ? q.options : [];
     const findOpt = (key) => opts.find((o) => String(o.key || "").toUpperCase() === key)?.text || "";
@@ -3282,9 +3409,11 @@ function QuestionBankManagerView({
     setEditOptB(findOpt("B"));
     setEditOptC(findOpt("C"));
     setEditOptD(findOpt("D"));
+    setEditOptE(findOpt("E"));
     setEditCorrectAnswer(q.correct_answer || "");
     setEditWeight(Number(q.weight) || 1);
   };
+
   const toggleEditMultiKey = (key) => {
     const currentKeys = String(editCorrectAnswer || "")
       .split(",")
@@ -3293,9 +3422,10 @@ function QuestionBankManagerView({
     const nextSet = new Set(currentKeys);
     if (nextSet.has(key)) nextSet.delete(key);
     else nextSet.add(key);
-    const ordered = ["A", "B", "C", "D"].filter((k) => nextSet.has(k));
+    const ordered = ["A", "B", "C", "D", "E"].filter((k) => nextSet.has(k));
     setEditCorrectAnswer(ordered.join(","));
   };
+
   const handleUpdateQuestion = async (e) => {
     e.preventDefault();
     if (!supabase || !editingQuestion) return;
@@ -3309,7 +3439,8 @@ function QuestionBankManagerView({
         editOptA,
         editOptB,
         editOptC,
-        editOptD
+        editOptD,
+        editOptE
       );
       const { error } = await supabase
         .from("questions")
@@ -3333,6 +3464,7 @@ function QuestionBankManagerView({
       setSavingEdit(false);
     }
   };
+
   const handleDownloadQuestionTemplate = async () => {
     const sampleSubject = subjects[0]?.name || "Matematika";
     await downloadXlsxTemplateFile("Template_Bank_Soal_MIN4.xlsx", "Bank_Soal", [
@@ -3345,6 +3477,7 @@ function QuestionBankManagerView({
         option_b: "35",
         option_c: "40",
         option_d: "45",
+        option_e: "",
         correct_answer: "C",
         weight: 1,
         is_verified: true
@@ -3358,6 +3491,7 @@ function QuestionBankManagerView({
         option_b: "",
         option_c: "",
         option_d: "",
+        option_e: "",
         correct_answer: "Memiliki 4 sisi sama panjang, 4 sudut siku-siku, dan 2 diagonal sama panjang",
         weight: 5,
         is_verified: true
@@ -3365,6 +3499,7 @@ function QuestionBankManagerView({
     ]);
     showBanner("success", "Template Bank Soal (.xlsx) berhasil diunduh.");
   };
+
   const handleImportQuestionsFile = async (e) => {
     const file = e.target.files?.[0];
     e.target.value = "";
@@ -3410,7 +3545,8 @@ function QuestionBankManagerView({
             { key: "A", text: String(r.option_a || r.opsi_a || r.a || "").trim() },
             { key: "B", text: String(r.option_b || r.opsi_b || r.b || "").trim() },
             { key: "C", text: String(r.option_c || r.opsi_c || r.c || "").trim() },
-            { key: "D", text: String(r.option_d || r.opsi_d || r.d || "").trim() }
+            { key: "D", text: String(r.option_d || r.opsi_d || r.d || "").trim() },
+            { key: "E", text: String(r.option_e || r.opsi_e || r.e || "").trim() }
           ].filter((o) => o.text !== "");
           if (opts.length < 2) {
             errors.push(
@@ -3420,7 +3556,7 @@ function QuestionBankManagerView({
           }
           optionsJson = opts;
         } else {
-          optionsJson = buildOptionsByType(rawType, "", "", "", "");
+          optionsJson = buildOptionsByType(rawType, "", "", "", "", "");
         }
         validPayloads.push({
           subject_id: matchedSubjectId,
@@ -3455,10 +3591,11 @@ function QuestionBankManagerView({
       showBanner("error", `Gagal mengimpor Bank Soal: ${err.message}`);
     }
   };
+
   const handleSaveQuestion = async (e) => {
     e.preventDefault();
     if (!supabase || !questionText.trim()) return;
-    const options = buildOptionsByType(qType, optA, optB, optC, optD);
+    const options = buildOptionsByType(qType, optA, optB, optC, optD, optE);
     const { error } = await supabase.from("questions").insert([
       {
         subject_id: subjectId || null,
@@ -3478,15 +3615,18 @@ function QuestionBankManagerView({
     setOptB("");
     setOptC("");
     setOptD("");
+    setOptE("");
     await onRefresh();
     showBanner("success", "Butir soal berhasil disimpan ke Bank Soal.");
   };
+
   const handleDelete = async (id) => {
     const { error } = await supabase.from("questions").delete().eq("id", id);
     if (error) return showBanner("error", error.message);
     await onRefresh();
     showBanner("success", "Butir soal dihapus.");
   };
+
   const handlePrintBankSoal = (includeKey = false) => {
     if (filteredQuestions.length === 0) {
       return showBanner("error", "Belum ada soal pada filter ini untuk dicetak.");
@@ -3529,6 +3669,7 @@ function QuestionBankManagerView({
     });
     openPrintDocumentWindow(html);
   };
+
   return (
     <div className="space-y-4">
       <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm space-y-4">
@@ -3571,6 +3712,7 @@ function QuestionBankManagerView({
             </button>
           </div>
         </div>
+
         {importSummary && (
           <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3 text-xs space-y-1">
             <div className="font-extrabold text-emerald-900">
@@ -3586,6 +3728,7 @@ function QuestionBankManagerView({
             )}
           </div>
         )}
+
         <form onSubmit={handleSaveQuestion} className="space-y-3">
           <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
             <div>
@@ -3638,6 +3781,7 @@ function QuestionBankManagerView({
               />
             </div>
           </div>
+
           <div>
             <label className="block text-xs font-bold text-slate-700 mb-1">Pertanyaan Soal</label>
             <textarea
@@ -3648,6 +3792,7 @@ function QuestionBankManagerView({
               className="w-full border border-slate-300 rounded-xl px-3 py-2 text-xs"
             />
           </div>
+
           {(qType === "PG" || qType === "PG_KOMPLEKS") && (
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
               <input
@@ -3678,8 +3823,16 @@ function QuestionBankManagerView({
                 onChange={(e) => setOptD(e.target.value)}
                 className="border border-slate-300 rounded-xl px-3 py-2 text-xs"
               />
+              <input
+                type="text"
+                placeholder="Opsi E (Opsional)"
+                value={optE}
+                onChange={(e) => setOptE(e.target.value)}
+                className="border border-slate-300 rounded-xl px-3 py-2 text-xs sm:col-span-2"
+              />
             </div>
           )}
+
           <div className="flex flex-wrap items-end gap-3">
             <div className="flex-1 min-w-[200px]">
               <label className="block text-xs font-bold text-slate-700 mb-1">
@@ -3702,6 +3855,7 @@ function QuestionBankManagerView({
           </div>
         </form>
       </div>
+
       <div className="flex flex-wrap gap-3">
         <div className="flex items-center gap-2 bg-white border border-slate-200 rounded-xl px-3 py-2 flex-1 min-w-[200px]">
           <Search className="w-4 h-4 text-slate-400" />
@@ -3726,6 +3880,7 @@ function QuestionBankManagerView({
           ))}
         </select>
       </div>
+
       <div className="space-y-2">
         {filteredQuestions.length === 0 ? (
           <div className="bg-white border border-slate-200 rounded-2xl p-6 text-center text-xs text-slate-500">
@@ -3788,6 +3943,7 @@ function QuestionBankManagerView({
           })
         )}
       </div>
+
       {editingQuestion && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50 overflow-y-auto">
           <div className="bg-white rounded-2xl max-w-2xl w-full p-5 space-y-4 shadow-lg my-auto">
@@ -3898,6 +4054,13 @@ function QuestionBankManagerView({
                     onChange={(e) => setEditOptD(e.target.value)}
                     className="border border-slate-300 rounded-xl px-3 py-2"
                   />
+                  <input
+                    type="text"
+                    placeholder="Opsi E (Opsional)"
+                    value={editOptE}
+                    onChange={(e) => setEditOptE(e.target.value)}
+                    className="border border-slate-300 rounded-xl px-3 py-2 sm:col-span-2"
+                  />
                 </div>
               )}
               <div className="space-y-2">
@@ -3911,7 +4074,7 @@ function QuestionBankManagerView({
                 </label>
                 {editType === "PG_KOMPLEKS" && (
                   <div className="flex flex-wrap gap-2">
-                    {["A", "B", "C", "D"].map((k) => {
+                    {["A", "B", "C", "D", "E"].map((k) => {
                       const activeKeys = String(editCorrectAnswer || "")
                         .split(",")
                         .map((s) => s.trim().toUpperCase())
@@ -3936,7 +4099,7 @@ function QuestionBankManagerView({
                 )}
                 {editType === "PG" && (
                   <div className="flex flex-wrap gap-2">
-                    {["A", "B", "C", "D"].map((k) => {
+                    {["A", "B", "C", "D", "E"].map((k) => {
                       const isChecked = String(editCorrectAnswer || "").trim().toUpperCase() === k;
                       return (
                         <button
@@ -3987,6 +4150,7 @@ function QuestionBankManagerView({
     </div>
   );
 }
+
 // ============================================================================
 // MODUL 5: JADWAL UJIAN & CETAK NASKAH SOAL BERKOP RESMI
 // ============================================================================
@@ -4014,20 +4178,24 @@ function ExamsManagerView({
     "Berdoalah sebelum mengerjakan ujian. Pilihlah jawaban yang paling tepat."
   );
   const [selectedQuestionIds, setSelectedQuestionIds] = useState([]);
+
   const availableQuestions = useMemo(
     () => questions.filter((q) => !subjectId || q.subject_id === subjectId),
     [questions, subjectId]
   );
+
   const allQuestionIds = useMemo(
     () => availableQuestions.map((q) => q.id),
     [availableQuestions]
   );
+
   const isAllSelected = useMemo(
     () =>
       allQuestionIds.length > 0 &&
       allQuestionIds.every((id) => selectedQuestionIds.includes(id)),
     [allQuestionIds, selectedQuestionIds]
   );
+
   const handleToggleSelectAllQuestions = () => {
     if (isAllSelected) {
       setSelectedQuestionIds((prev) => prev.filter((id) => !allQuestionIds.includes(id)));
@@ -4035,16 +4203,19 @@ function ExamsManagerView({
       setSelectedQuestionIds((prev) => Array.from(new Set([...prev, ...allQuestionIds])));
     }
   };
+
   const toggleQuestionSelect = (id) => {
     setSelectedQuestionIds((prev) =>
       prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]
     );
   };
+
   const toggleClassSelect = (id) => {
     setSelectedClassIds((prev) =>
       prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]
     );
   };
+
   const handleToggleAllClasses = () => {
     if (selectedClassIds.length === classesList.length) {
       setSelectedClassIds([]);
@@ -4052,6 +4223,7 @@ function ExamsManagerView({
       setSelectedClassIds(classesList.map((c) => c.id));
     }
   };
+
   const handleCreateExam = async (e) => {
     e.preventDefault();
     if (!supabase) return;
@@ -4085,6 +4257,7 @@ function ExamsManagerView({
     await onRefresh();
     showBanner("success", "Paket jadwal ujian berhasil dibuat.");
   };
+
   const handlePrintNaskahSoal = (exam) => {
     const qIds = Array.isArray(exam.question_ids) ? exam.question_ids : [];
     const examQuestions = qIds
@@ -4105,6 +4278,7 @@ function ExamsManagerView({
             .map((id) => classesList.find((c) => c.id === id)?.name)
             .filter(Boolean)
             .join(", ") || "-";
+
     const bodyHtml = `
       <div style="border:1px solid #1f2937; padding:8px 10px; margin-bottom:10px; font-size:10pt;">
         <strong>PETUNJUK PENGERJAAN:</strong><br/>
@@ -4127,6 +4301,7 @@ function ExamsManagerView({
           .join("")}
       </ol>
     `;
+
     const html = buildOfficialDocumentHtml({
       title: `NASKAH SOAL ${exam.title}`,
       subtitle: `${schoolSettings.school_name} • Tahun Pelajaran ${schoolSettings.academic_year}`,
@@ -4149,6 +4324,7 @@ function ExamsManagerView({
     });
     openPrintDocumentWindow(html);
   };
+
   return (
     <div className="space-y-4">
       <form
@@ -4326,6 +4502,7 @@ function ExamsManagerView({
           Simpan & Terbitkan Jadwal Ujian
         </button>
       </form>
+
       <div className="bg-white border border-slate-200 rounded-2xl overflow-x-auto">
         <table className="w-full text-xs">
           <thead className="bg-slate-50 border-b border-slate-200 font-bold text-slate-700">
@@ -4377,6 +4554,7 @@ function ExamsManagerView({
     </div>
   );
 }
+
 // ============================================================================
 // MODUL 6: PESERTA UJIAN & DAFTAR HADIR BERKOP RESMI
 // ============================================================================
@@ -4398,20 +4576,23 @@ function ParticipantsManagerView({
   const [selectedExamId, setSelectedExamId] = useState("");
   const [selectedClassIds, setSelectedClassIds] = useState([]);
   const [filterClassIds, setFilterClassIds] = useState([]);
+
   const toggleAssignClass = (id) => {
     setSelectedClassIds((prev) =>
       prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]
     );
   };
+
   const toggleFilterClass = (id) => {
     setFilterClassIds((prev) =>
       prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]
     );
   };
+
   const combinedParticipants = useMemo(() => {
     if (!selectedExamId) return [];
     const byStudentKey = new Map();
-    const resolveStudent = (stId, stName, stNisn, stClassId) => {
+    const resolveStudent = (stId, stName, stNisn) => {
       return students.find(
         (s) =>
           (stId && String(s.id) === String(stId)) ||
@@ -4420,10 +4601,11 @@ function ParticipantsManagerView({
             (s.full_name || "").trim().toLowerCase() === String(stName).trim().toLowerCase())
       );
     };
+
     participants
       .filter((p) => p.exam_id === selectedExamId)
       .forEach((p) => {
-        const stObj = resolveStudent(p.student_id, p.student_name, p.nisn, p.class_id);
+        const stObj = resolveStudent(p.student_id, p.student_name, p.nisn);
         const key = String(stObj?.id || p.student_id || p.nisn || p.student_name);
         const hasAttempt = attempts.some(
           (a) =>
@@ -4452,10 +4634,11 @@ function ParticipantsManagerView({
               : "Terdaftar"
         });
       });
+
     examResults
       .filter((r) => r.exam_id === selectedExamId)
       .forEach((r) => {
-        const stObj = resolveStudent(r.student_id, r.student_name, "", "");
+        const stObj = resolveStudent(r.student_id, r.student_name, "");
         const key = String(stObj?.id || r.student_id || r.student_name);
         if (!byStudentKey.has(key)) {
           byStudentKey.set(key, {
@@ -4469,10 +4652,11 @@ function ParticipantsManagerView({
           });
         }
       });
+
     attempts
       .filter((a) => a.exam_id === selectedExamId)
       .forEach((a) => {
-        const stObj = resolveStudent(a.student_id, a.student_name, "", "");
+        const stObj = resolveStudent(a.student_id, a.student_name, "");
         const key = String(stObj?.id || a.student_id || a.student_name);
         if (!byStudentKey.has(key)) {
           const resObj = examResults.find(
@@ -4493,14 +4677,17 @@ function ParticipantsManagerView({
           });
         }
       });
+
     return Array.from(byStudentKey.values()).sort((a, b) =>
       (a.student_name || "").localeCompare(b.student_name || "", "id")
     );
   }, [selectedExamId, participants, attempts, examResults, students]);
+
   const filteredExamParticipants = useMemo(() => {
     if (filterClassIds.length === 0) return combinedParticipants;
     return combinedParticipants.filter((p) => filterClassIds.includes(p.class_id));
   }, [combinedParticipants, filterClassIds]);
+
   const handleAssignByClasses = async () => {
     if (!supabase || !selectedExamId || selectedClassIds.length === 0) {
       return showBanner("error", "Pilih paket ujian dan minimal satu kelas terlebih dahulu.");
@@ -4532,6 +4719,7 @@ function ParticipantsManagerView({
     await onRefresh();
     showBanner("success", `${payloads.length} peserta berhasil ditambahkan ke ujian.`);
   };
+
   const handlePrintDaftarPeserta = () => {
     const exam = exams.find((e) => e.id === selectedExamId);
     if (!exam || filteredExamParticipants.length === 0) {
@@ -4545,6 +4733,7 @@ function ParticipantsManagerView({
             .filter(Boolean)
             .join(", ")
         : "Semua Kelas Peserta";
+
     const bodyHtml = `
       <table class="data-table">
         <thead>
@@ -4572,6 +4761,7 @@ function ParticipantsManagerView({
         </tbody>
       </table>
     `;
+
     const html = buildOfficialDocumentHtml({
       title: "DAFTAR PESERTA & DAFTAR HADIR UJIAN",
       subtitle: `${exam.title} (${selectedClassNames})`,
@@ -4589,6 +4779,7 @@ function ParticipantsManagerView({
     });
     openPrintDocumentWindow(html);
   };
+
   const handleExportParticipantsExcel = async () => {
     const exam = exams.find((e) => e.id === selectedExamId);
     if (!exam || filteredExamParticipants.length === 0) {
@@ -4619,6 +4810,7 @@ function ParticipantsManagerView({
       isSimulation
     });
   };
+
   return (
     <div className="space-y-4">
       <div className="bg-white border border-slate-200 rounded-2xl p-4 space-y-3 text-xs">
@@ -4680,6 +4872,7 @@ function ParticipantsManagerView({
           </button>
         </div>
       </div>
+
       {selectedExamId && (
         <div className="bg-white border border-slate-200 rounded-2xl p-4 space-y-3">
           <div className="flex flex-wrap items-center justify-between gap-3">
@@ -4735,6 +4928,7 @@ function ParticipantsManagerView({
           </div>
         </div>
       )}
+
       <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
         <table className="w-full text-xs">
           <thead className="bg-slate-50 border-b border-slate-200 font-bold text-slate-700">
@@ -4774,6 +4968,7 @@ function ParticipantsManagerView({
     </div>
   );
 }
+
 // ============================================================================
 // MODUL 7: PORTAL UJIAN SISWA (TIMER, SIMPAN OTOMATIS & PENYERAHAN)
 // ============================================================================
@@ -4799,6 +4994,7 @@ function StudentExamPortalView({
   const [flaggedMap, setFlaggedMap] = useState({});
   const [secondsLeft, setSecondsLeft] = useState(0);
   const [confirmFinishOpen, setConfirmFinishOpen] = useState(false);
+
   const myExams = useMemo(() => {
     if (isSimulation) return exams.filter((e) => e.status === "AKTIF");
     const myPartExamIds = new Set(
@@ -4826,11 +5022,13 @@ function StudentExamPortalView({
       return (isAssignedAsParticipant || matchesTargetClass) && e.status !== "NONAKTIF";
     });
   }, [exams, participants, currentUser, isSimulation]);
+
   const activeQuestions = useMemo(() => {
     if (!activeExam) return [];
     const qIds = Array.isArray(activeExam.question_ids) ? activeExam.question_ids : [];
     return qIds.map((id) => questions.find((q) => q.id === id)).filter(Boolean);
   }, [activeExam, questions]);
+
   useEffect(() => {
     if (!activeExam) return;
     const interval = setInterval(() => {
@@ -4845,6 +5043,7 @@ function StudentExamPortalView({
     }, 1000);
     return () => clearInterval(interval);
   }, [activeExam]);
+
   const handleStartExam = (exam) => {
     const storageKey = `cbt_min4_ans_${exam.id}_${currentUser.id}`;
     const savedLocal = localStorage.getItem(storageKey);
@@ -4861,6 +5060,7 @@ function StudentExamPortalView({
     setSecondsLeft((Number(exam.duration_minutes) || 60) * 60);
     setActiveExam(exam);
   };
+
   const handleSelectAnswer = async (questionId, value) => {
     const updated = { ...answersMap, [questionId]: value };
     setAnswersMap(updated);
@@ -4882,6 +5082,7 @@ function StudentExamPortalView({
       }
     }
   };
+
   const handleSubmitExam = async (isAuto = false) => {
     if (!activeExam) return;
     setConfirmFinishOpen(false);
@@ -4943,6 +5144,7 @@ function StudentExamPortalView({
         : "Ujian berhasil diselesaikan dan jawaban tersimpan."
     );
   };
+
   if (activeExam) {
     const q = activeQuestions[currentIndex];
     const mins = Math.floor(secondsLeft / 60);
@@ -5148,6 +5350,7 @@ function StudentExamPortalView({
       </div>
     );
   }
+
   if (mode === "student_history") {
     const myResults = examResults.filter((r) => r.student_id === currentUser.id);
     return (
@@ -5183,6 +5386,7 @@ function StudentExamPortalView({
       </div>
     );
   }
+
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
       {myExams.length === 0 ? (
@@ -5240,6 +5444,7 @@ function StudentExamPortalView({
     </div>
   );
 }
+
 // ============================================================================
 // MODUL 8: HASIL UJIAN, KOREKSI OTOMATIS & KONFIGURASI RUMUS
 // ============================================================================
@@ -5256,6 +5461,7 @@ function ResultsAndGradingView({
 }) {
   const [selectedExamId, setSelectedExamId] = useState("");
   const [formulaForm, setFormulaForm] = useState(gradingFormula);
+
   const filteredResults = useMemo(
     () =>
       selectedExamId
@@ -5263,6 +5469,7 @@ function ResultsAndGradingView({
         : examResults,
     [examResults, selectedExamId]
   );
+
   const handleRecalculateExam = async () => {
     if (!supabase || !selectedExamId) {
       return showBanner("error", "Pilih paket ujian yang akan dihitung ulang.");
@@ -5313,6 +5520,7 @@ function ResultsAndGradingView({
     await onRefresh();
     showBanner("success", "Perhitungan ulang nilai selesai berdasarkan kunci & rumus terbaru.");
   };
+
   return (
     <div className="space-y-4">
       <div className="bg-white border border-slate-200 rounded-2xl p-4 grid grid-cols-1 sm:grid-cols-4 gap-3 items-end">
@@ -5355,6 +5563,7 @@ function ResultsAndGradingView({
           Simpan Rumus Nilai
         </button>
       </div>
+
       <div className="flex flex-wrap items-center justify-between gap-3">
         <select
           value={selectedExamId}
@@ -5379,6 +5588,7 @@ function ResultsAndGradingView({
           </button>
         )}
       </div>
+
       <div className="bg-white border border-slate-200 rounded-2xl overflow-x-auto">
         <table className="w-full text-xs">
           <thead className="bg-slate-50 border-b border-slate-200 font-bold text-slate-700">
@@ -5431,6 +5641,7 @@ function ResultsAndGradingView({
     </div>
   );
 }
+
 // ============================================================================
 // MODUL 9: ANALISIS BUTIR SOAL (TINGKAT KESUKARAN & DAYA PEMBEDA)
 // ============================================================================
@@ -5446,6 +5657,7 @@ function ItemAnalysisView({
   showBanner
 }) {
   const [selectedExamId, setSelectedExamId] = useState("");
+
   const analysisRows = useMemo(() => {
     if (!selectedExamId) return [];
     const exam = exams.find((e) => e.id === selectedExamId);
@@ -5461,6 +5673,7 @@ function ItemAnalysisView({
     const lowerIds = new Set(
       groupSize > 0 ? results.slice(totalParticipants - groupSize).map((r) => r.student_id) : []
     );
+
     return examQs.map((q, idx) => {
       let correct = 0;
       let wrong = 0;
@@ -5503,6 +5716,7 @@ function ItemAnalysisView({
               : dIndex >= 0.2
                 ? "Cukup"
                 : "Perlu Revisi";
+
       return {
         no: idx + 1,
         question_text: q.question_text,
@@ -5515,6 +5729,7 @@ function ItemAnalysisView({
       };
     });
   }, [selectedExamId, exams, questions, studentAnswers, examResults]);
+
   const handlePrintAnalysis = () => {
     const exam = exams.find((e) => e.id === selectedExamId);
     if (!exam || analysisRows.length === 0) {
@@ -5567,6 +5782,7 @@ function ItemAnalysisView({
     });
     openPrintDocumentWindow(html);
   };
+
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -5593,6 +5809,7 @@ function ItemAnalysisView({
           </button>
         )}
       </div>
+
       <div className="bg-white border border-slate-200 rounded-2xl overflow-x-auto">
         <table className="w-full text-xs">
           <thead className="bg-slate-50 border-b border-slate-200 font-bold text-slate-700">
@@ -5634,6 +5851,7 @@ function ItemAnalysisView({
     </div>
   );
 }
+
 // ============================================================================
 // MODUL 10: LAPORAN RESMI MADRASAH (PDF, EXCEL BERKOP, WORD & CSV)
 // ============================================================================
@@ -5649,6 +5867,7 @@ function OfficialReportsView({
   showBanner
 }) {
   const [selectedExamId, setSelectedExamId] = useState("");
+
   const rows = useMemo(
     () =>
       (selectedExamId
@@ -5670,6 +5889,7 @@ function OfficialReportsView({
       }),
     [examResults, selectedExamId, students, classesList]
   );
+
   const stats = useMemo(() => {
     if (rows.length === 0) return { max: 0, min: 0, avg: 0 };
     const scores = rows.map((r) => r.nilai);
@@ -5679,6 +5899,7 @@ function OfficialReportsView({
       avg: Number((scores.reduce((a, b) => a + b, 0) / scores.length).toFixed(2))
     };
   }, [rows]);
+
   const buildReportHtml = () => {
     const exam = exams.find((e) => e.id === selectedExamId);
     const sub = exam ? subjects.find((s) => s.id === exam.subject_id) : null;
@@ -5732,14 +5953,17 @@ function OfficialReportsView({
       isSimulation
     });
   };
+
   const handlePrintPdf = () => {
     if (rows.length === 0) return showBanner("error", "Belum ada data nilai untuk dicetak.");
     openPrintDocumentWindow(buildReportHtml());
   };
+
   const handleDownloadWord = () => {
     if (rows.length === 0) return showBanner("error", "Belum ada data nilai untuk diunduh.");
     downloadWordDocFile("Laporan_Hasil_Ujian_MIN4.doc", buildReportHtml());
   };
+
   const handleDownloadExcel = async () => {
     if (rows.length === 0) return showBanner("error", "Belum ada data nilai untuk diunduh.");
     await exportOfficialExcelWithKop({
@@ -5762,6 +5986,7 @@ function OfficialReportsView({
       isSimulation
     });
   };
+
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -5804,6 +6029,7 @@ function OfficialReportsView({
           </button>
         </div>
       </div>
+
       <div className="grid grid-cols-3 gap-3">
         <div className="bg-white border border-slate-200 rounded-2xl p-3 text-center">
           <div className="text-[11px] text-slate-500 font-bold">Nilai Tertinggi</div>
@@ -5818,6 +6044,7 @@ function OfficialReportsView({
           <div className="text-lg font-extrabold text-slate-900">{stats.avg}</div>
         </div>
       </div>
+
       <div className="bg-white border border-slate-200 rounded-2xl overflow-x-auto">
         <table className="w-full text-xs">
           <thead className="bg-slate-50 border-b border-slate-200 font-bold text-slate-700">
@@ -5855,8 +6082,9 @@ function OfficialReportsView({
     </div>
   );
 }
+
 // ============================================================================
-// MODUL 11: PENGATURAN DOKUMEN TERPUSAT (KOP SURAT RESMI MIN 4 MAGELANG)
+// MODUL 11: PENGATURAN DOKUMEN & KOP SURAT TERPUSAT
 // ============================================================================
 function DocumentSettingsView({
   schoolSettings,
@@ -5864,196 +6092,237 @@ function DocumentSettingsView({
   onSaveDocumentSettings,
   showBanner
 }) {
-  const [form, setForm] = useState(documentSettings);
+  const [cfg, setCfg] = useState({ ...DEFAULT_DOCUMENT_SETTINGS, ...documentSettings });
   useEffect(() => {
-    setForm(documentSettings);
+    setCfg({ ...DEFAULT_DOCUMENT_SETTINGS, ...documentSettings });
   }, [documentSettings]);
-  const handleUploadKop = (e) => {
+
+  const handleKopFile = (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
     const reader = new FileReader();
     reader.onloadend = () => {
-      setForm((prev) => ({ ...prev, kop_image: reader.result }));
-      showBanner("success", "Gambar kop surat baru berhasil dimuat. Klik Simpan Pengaturan.");
+      setCfg((prev) => ({ ...prev, kop_image: reader.result }));
     };
     reader.readAsDataURL(file);
   };
-  const handleTestPrint = () => {
+
+  const handleTestPreview = () => {
     const html = buildOfficialDocumentHtml({
-      title: "UJI CETAK TEMPLATE DOKUMEN RESMI",
-      subtitle: "Verifikasi Kop Surat, Margin, dan Ukuran Kertas",
+      title: "CONTOH DOKUMEN RESMI BERKOP",
+      subtitle: "Pratinjau Kop Surat, Margin, Header & Footer Terpusat",
       metaRows: [
-        { label: "Ukuran Kertas", value: form.paper_size },
-        { label: "Orientasi", value: form.orientation },
-        {
-          label: "Margin (mm)",
-          value: `Atas ${form.margin_top_mm}, Bawah ${form.margin_bottom_mm}, Kiri ${form.margin_left_mm}, Kanan ${form.margin_right_mm}`
-        }
+        { label: "Madrasah", value: schoolSettings.school_name },
+        { label: "Tahun Pelajaran", value: schoolSettings.academic_year }
       ],
-      bodyHtml:
-        "<p>Dokumen ini merupakan contoh pratinjau template terpusat <strong>DOCUMENT TEMPLATE CBT MIN 4 MAGELANG</strong>.</p>",
+      bodyHtml: `<p style="font-size:10.5pt;">Dokumen ini menguji tampilan kop resmi, ukuran kertas (${cfg.paper_size}), orientasi (${cfg.orientation}), serta margin atas/bawah/kiri/kanan.</p>`,
       schoolSettings,
-      documentSettings: form
+      documentSettings: cfg,
+      includeSignature: true
     });
     openPrintDocumentWindow(html);
   };
+
   return (
-    <div className="bg-white border border-slate-200 rounded-2xl p-5 space-y-5 shadow-sm">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <div>
-          <h2 className="text-sm font-extrabold text-slate-900">
-            DOCUMENT TEMPLATE CBT MIN 4 MAGELANG
-          </h2>
-          <p className="text-xs text-slate-500">
-            Sistem kop surat terpusat untuk seluruh dokumen PDF, Excel (.xlsx), Word, dan Cetak.
-          </p>
+    <div className="bg-white border border-slate-200 rounded-2xl p-5 space-y-5 shadow-sm text-xs">
+      <h2 className="text-sm font-extrabold text-slate-900">
+        Pengaturan Template Dokumen & Kop Surat Terpusat
+      </h2>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+        <div className="space-y-3">
+          <div>
+            <label className="block font-bold text-slate-700 mb-1">
+              Gambar Kop Surat Resmi (Default: /image_3fe900.png)
+            </label>
+            <input type="file" accept="image/*" onChange={handleKopFile} className="text-xs" />
+          </div>
+          <div className="border border-slate-200 rounded-xl p-3 bg-slate-50">
+            <img
+              src={cfg.kop_image || DEFAULT_KOP_IMAGE_SRC}
+              alt="Preview Kop Surat"
+              className="w-full max-h-32 object-contain mx-auto"
+            />
+          </div>
+          <div className="space-y-1.5">
+            <label className="flex items-center gap-2 font-semibold">
+              <input
+                type="checkbox"
+                checked={cfg.use_kop_pdf}
+                onChange={(e) => setCfg({ ...cfg, use_kop_pdf: e.target.checked })}
+              />
+              Gunakan Kop pada Cetak / PDF
+            </label>
+            <label className="flex items-center gap-2 font-semibold">
+              <input
+                type="checkbox"
+                checked={cfg.use_kop_excel}
+                onChange={(e) => setCfg({ ...cfg, use_kop_excel: e.target.checked })}
+              />
+              Gunakan Kop pada Ekspor Excel (.xlsx)
+            </label>
+            <label className="flex items-center gap-2 font-semibold">
+              <input
+                type="checkbox"
+                checked={cfg.use_kop_word}
+                onChange={(e) => setCfg({ ...cfg, use_kop_word: e.target.checked })}
+              />
+              Gunakan Kop pada Dokumen Word (.doc)
+            </label>
+          </div>
         </div>
-        <div className="flex flex-wrap gap-2">
-          <button
-            type="button"
-            onClick={handleTestPrint}
-            className="px-3.5 py-2 rounded-xl border border-slate-300 text-xs font-bold flex items-center gap-1.5"
-          >
-            <Printer className="w-4 h-4" />
-            Uji Cetak / Preview PDF
-          </button>
-          <button
-            type="button"
-            onClick={() => onSaveDocumentSettings(form)}
-            className="px-4 py-2 rounded-xl bg-emerald-700 text-white text-xs font-extrabold flex items-center gap-1.5"
-          >
-            <Save className="w-4 h-4" />
-            Simpan Pengaturan
-          </button>
-        </div>
-      </div>
-      <div className="border border-slate-200 rounded-2xl p-4 bg-slate-50 space-y-3">
-        <div className="text-xs font-bold text-slate-700">Preview Kop Surat Resmi Aktif:</div>
-        <div className="bg-white border border-slate-200 rounded-xl p-3">
-          <img
-            src={form.kop_image || DEFAULT_KOP_IMAGE_SRC}
-            alt="Kop Surat Resmi MIN 4 Magelang"
-            className="w-full max-h-36 object-contain mx-auto"
-          />
-        </div>
-        <div className="flex flex-wrap gap-3 items-center">
-          <label className="cursor-pointer px-3.5 py-2 rounded-xl bg-white border border-slate-300 hover:bg-slate-100 text-xs font-bold flex items-center gap-1.5">
-            <Upload className="w-3.5 h-3.5" />
-            Ganti / Upload Kop Surat Asli
-            <input type="file" accept="image/*" onChange={handleUploadKop} className="hidden" />
+
+        <div className="space-y-3">
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block font-bold text-slate-700 mb-1">Ukuran Kertas</label>
+              <select
+                value={cfg.paper_size}
+                onChange={(e) => setCfg({ ...cfg, paper_size: e.target.value })}
+                className="w-full border border-slate-300 rounded-xl px-3 py-2"
+              >
+                <option value="A4">A4</option>
+                <option value="F4">F4 / Folio</option>
+                <option value="Letter">Letter</option>
+              </select>
+            </div>
+            <div>
+              <label className="block font-bold text-slate-700 mb-1">Orientasi Halaman</label>
+              <select
+                value={cfg.orientation}
+                onChange={(e) => setCfg({ ...cfg, orientation: e.target.value })}
+                className="w-full border border-slate-300 rounded-xl px-3 py-2"
+              >
+                <option value="portrait">Portrait (Tegak)</option>
+                <option value="landscape">Landscape (Mendatar)</option>
+              </select>
+            </div>
+          </div>
+          <div className="grid grid-cols-4 gap-2">
+            <div>
+              <label className="block font-bold text-slate-700 mb-1">Atas (mm)</label>
+              <input
+                type="number"
+                value={cfg.margin_top_mm}
+                onChange={(e) => setCfg({ ...cfg, margin_top_mm: Number(e.target.value) })}
+                className="w-full border border-slate-300 rounded-xl px-2 py-1.5"
+              />
+            </div>
+            <div>
+              <label className="block font-bold text-slate-700 mb-1">Bawah (mm)</label>
+              <input
+                type="number"
+                value={cfg.margin_bottom_mm}
+                onChange={(e) => setCfg({ ...cfg, margin_bottom_mm: Number(e.target.value) })}
+                className="w-full border border-slate-300 rounded-xl px-2 py-1.5"
+              />
+            </div>
+            <div>
+              <label className="block font-bold text-slate-700 mb-1">Kiri (mm)</label>
+              <input
+                type="number"
+                value={cfg.margin_left_mm}
+                onChange={(e) => setCfg({ ...cfg, margin_left_mm: Number(e.target.value) })}
+                className="w-full border border-slate-300 rounded-xl px-2 py-1.5"
+              />
+            </div>
+            <div>
+              <label className="block font-bold text-slate-700 mb-1">Kanan (mm)</label>
+              <input
+                type="number"
+                value={cfg.margin_right_mm}
+                onChange={(e) => setCfg({ ...cfg, margin_right_mm: Number(e.target.value) })}
+                className="w-full border border-slate-300 rounded-xl px-2 py-1.5"
+              />
+            </div>
+          </div>
+          <div>
+            <label className="block font-bold text-slate-700 mb-1">Teks Footer Dokumen</label>
+            <input
+              type="text"
+              value={cfg.footer_text}
+              onChange={(e) => setCfg({ ...cfg, footer_text: e.target.value })}
+              className="w-full border border-slate-300 rounded-xl px-3 py-2"
+            />
+          </div>
+          <label className="flex items-center gap-2 font-semibold">
+            <input
+              type="checkbox"
+              checked={cfg.show_print_date}
+              onChange={(e) => setCfg({ ...cfg, show_print_date: e.target.checked })}
+            />
+            Tampilkan Tanggal Cetak Otomatis
           </label>
-          <button
-            type="button"
-            onClick={() => setForm((prev) => ({ ...prev, kop_image: DEFAULT_KOP_IMAGE_SRC }))}
-            className="px-3.5 py-2 rounded-xl border border-slate-300 text-xs font-semibold text-slate-600"
-          >
-            Gunakan Kop Bawaan MIN 4 Magelang
-          </button>
         </div>
       </div>
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs">
-        <label className="flex items-center gap-2 font-bold">
-          <input
-            type="checkbox"
-            checked={form.use_kop_pdf}
-            onChange={(e) => setForm({ ...form, use_kop_pdf: e.target.checked })}
-          />
-          Tampilkan Kop pada PDF / Cetak
-        </label>
-        <label className="flex items-center gap-2 font-bold">
-          <input
-            type="checkbox"
-            checked={form.use_kop_excel}
-            onChange={(e) => setForm({ ...form, use_kop_excel: e.target.checked })}
-          />
-          Sematkan Kop pada Excel (.xlsx)
-        </label>
-        <label className="flex items-center gap-2 font-bold">
-          <input
-            type="checkbox"
-            checked={form.use_kop_word}
-            onChange={(e) => setForm({ ...form, use_kop_word: e.target.checked })}
-          />
-          Tampilkan Kop pada Word (.doc)
-        </label>
-        <div>
-          <label className="block font-bold text-slate-700 mb-1">Ukuran Kertas</label>
-          <select
-            value={form.paper_size}
-            onChange={(e) => setForm({ ...form, paper_size: e.target.value })}
-            className="w-full border border-slate-300 rounded-xl px-3 py-2"
-          >
-            <option value="A4">A4 (210 x 297 mm)</option>
-            <option value="F4">F4 / Folio (215 x 330 mm)</option>
-          </select>
-        </div>
-        <div>
-          <label className="block font-bold text-slate-700 mb-1">Orientasi</label>
-          <select
-            value={form.orientation}
-            onChange={(e) => setForm({ ...form, orientation: e.target.value })}
-            className="w-full border border-slate-300 rounded-xl px-3 py-2"
-          >
-            <option value="portrait">Portrait (Tegak)</option>
-            <option value="landscape">Landscape (Mendatar)</option>
-          </select>
-        </div>
-        <div>
-          <label className="block font-bold text-slate-700 mb-1">Teks Footer</label>
-          <input
-            type="text"
-            value={form.footer_text}
-            onChange={(e) => setForm({ ...form, footer_text: e.target.value })}
-            className="w-full border border-slate-300 rounded-xl px-3 py-2"
-          />
-        </div>
+
+      <div className="flex flex-wrap gap-2 pt-2">
+        <button
+          type="button"
+          onClick={() => onSaveDocumentSettings(cfg)}
+          className="px-4 py-2.5 rounded-xl bg-emerald-700 text-white font-extrabold flex items-center gap-1.5"
+        >
+          <Save className="w-4 h-4" />
+          Simpan Pengaturan Dokumen
+        </button>
+        <button
+          type="button"
+          onClick={handleTestPreview}
+          className="px-4 py-2.5 rounded-xl border border-slate-300 font-bold flex items-center gap-1.5"
+        >
+          <Printer className="w-4 h-4" />
+          Uji Cetak Dokumen
+        </button>
       </div>
     </div>
   );
 }
+
 // ============================================================================
-// MODUL 12: BACKUP DATA & PENGATURAN AKUN / SUPABASE
+// MODUL 12: BACKUP DATA & PENGATURAN AKUN / KREDENSIAL
 // ============================================================================
 function BackupDataView({ isSimulation, payload, showBanner }) {
-  const handleDownloadBackup = () => {
-    const json = JSON.stringify(
+  const handleDownloadJsonBackup = () => {
+    const prefix = isSimulation ? "SIMULASI_" : "";
+    const jsonStr = JSON.stringify(
       {
         exported_at: new Date().toISOString(),
-        environment: isSimulation ? "SIMULASI" : "PRODUKSI",
+        is_simulation: Boolean(isSimulation),
         ...payload
       },
       null,
       2
     );
-    const blob = new Blob([json], { type: "application/json" });
+    const blob = new Blob([jsonStr], { type: "application/json" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `${isSimulation ? "SIMULASI_" : ""}Backup_CBT_MIN4_${new Date().toISOString().slice(0, 10)}.json`;
+    a.download = `${prefix}Backup_CBT_MIN4_Magelang_${new Date().toISOString().slice(0, 10)}.json`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
-    showBanner("success", "Berkas cadangan database (JSON) berhasil diunduh.");
+    showBanner("success", "File backup JSON berhasil diunduh.");
   };
+
   return (
-    <div className="bg-white border border-slate-200 rounded-2xl p-5 space-y-4">
-      <h2 className="text-sm font-extrabold text-slate-900">Cadangan Database (Backup JSON)</h2>
-      <p className="text-xs text-slate-600">
-        Unduh salinan lengkap seluruh data madrasah (kelas, mata pelajaran, guru, siswa, bank soal,
-        jadwal ujian, peserta, jawaban, dan hasil nilai) ke komputer lokal Anda.
+    <div className="bg-white border border-slate-200 rounded-2xl p-5 space-y-4 text-xs">
+      <h2 className="text-sm font-extrabold text-slate-900">Backup & Ekspor Data Sistem</h2>
+      <p className="text-slate-600">
+        Unduh salinan cadangan seluruh data madrasah, bank soal, jadwal ujian, dan hasil nilai ke
+        dalam format JSON.
       </p>
       <button
         type="button"
-        onClick={handleDownloadBackup}
-        className="px-4 py-2.5 rounded-xl bg-emerald-700 text-white text-xs font-extrabold inline-flex items-center gap-2"
+        onClick={handleDownloadJsonBackup}
+        className="px-4 py-2.5 rounded-xl bg-emerald-700 text-white font-extrabold flex items-center gap-1.5"
       >
         <HardDriveDownload className="w-4 h-4" />
-        Unduh Backup Database Lengkap (.json)
+        Unduh Backup JSON Lengkap
       </button>
     </div>
   );
 }
+
 function AdminSettingsView({
   supabase,
   supabaseUrl,
@@ -6064,32 +6333,40 @@ function AdminSettingsView({
   onRefresh,
   showBanner
 }) {
-  const [url, setUrl] = useState(supabaseUrl);
-  const [key, setKey] = useState(supabaseKey);
-  const [newName, setNewName] = useState("");
-  const [newUser, setNewUser] = useState("");
-  const [newEmail, setNewEmail] = useState("");
-  const [newPass, setNewPass] = useState("");
+  const [urlInput, setUrlInput] = useState(supabaseUrl);
+  const [keyInput, setKeyInput] = useState(supabaseKey);
   const [newRole, setNewRole] = useState("GURU");
-  const handleCreateAccount = async (e) => {
+  const [newName, setNewName] = useState("");
+  const [newUsername, setNewUsername] = useState("");
+  const [newEmail, setNewEmail] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+
+  const handleCreateStaffAccount = async (e) => {
     e.preventDefault();
-    if (!supabase) return;
+    if (!supabase) return showBanner("error", "Supabase belum terhubung.");
+    if (newPassword.length < 8) {
+      return showBanner("error", "Password minimal 8 karakter.");
+    }
     try {
-      const tempClient = createSupabaseClient(supabaseUrl, supabaseKey, {
-        auth: { persistSession: false, autoRefreshToken: false }
+      const cleanEmail = newEmail.trim().toLowerCase();
+      const cleanUser = newUsername.trim().toLowerCase();
+      const { data: signUpData, error: signUpErr } = await supabase.auth.signUp({
+        email: cleanEmail,
+        password: newPassword
       });
-      const { data: authData, error: authErr } = await tempClient.auth.signUp({
-        email: newEmail.trim().toLowerCase(),
-        password: newPass
-      });
-      if (authErr) throw authErr;
-      if (!authData?.user?.id) throw new Error("Gagal membuat user di Supabase Auth.");
+      if (signUpErr) throw signUpErr;
+      const uid = signUpData?.user?.id;
+      if (!uid) {
+        throw new Error(
+          "Akun Auth dibuat namun konfirmasi email aktif di Supabase. Nonaktifkan 'Confirm email' pada Auth Providers Supabase."
+        );
+      }
       const { error: profErr } = await supabase.from("profiles").insert([
         {
-          id: authData.user.id,
+          id: uid,
           full_name: newName.trim(),
-          username: newUser.trim().toLowerCase(),
-          email: newEmail.trim().toLowerCase(),
+          username: cleanUser,
+          email: cleanEmail,
           role: newRole,
           is_active: true,
           is_simulation: Boolean(isSimulation)
@@ -6097,105 +6374,119 @@ function AdminSettingsView({
       ]);
       if (profErr) throw profErr;
       setNewName("");
-      setNewUser("");
+      setNewUsername("");
       setNewEmail("");
-      setNewPass("");
+      setNewPassword("");
       await onRefresh();
-      showBanner("success", `Akun ${newRole} berhasil dibuat.`);
+      showBanner("success", `Akun ${newRole} berhasil dibuat dan aktif.`);
     } catch (err) {
       showBanner("error", `Gagal membuat akun: ${err.message}`);
     }
   };
+
   return (
-    <div className="space-y-5">
+    <div className="space-y-5 text-xs">
       <div className="bg-white border border-slate-200 rounded-2xl p-5 space-y-3">
         <h2 className="text-sm font-extrabold text-slate-900">Koneksi Database Supabase</h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
           <div>
-            <label className="block font-bold text-slate-700 mb-1">Project URL</label>
+            <label className="block font-bold text-slate-700 mb-1">Supabase Project URL</label>
             <input
               type="text"
-              value={url}
-              onChange={(e) => setUrl(e.target.value)}
+              value={urlInput}
+              onChange={(e) => setUrlInput(e.target.value)}
               className="w-full border border-slate-300 rounded-xl px-3 py-2 font-mono"
             />
           </div>
           <div>
-            <label className="block font-bold text-slate-700 mb-1">Anon / Publishable Key</label>
+            <label className="block font-bold text-slate-700 mb-1">Supabase Anon / Publishable Key</label>
             <input
               type="text"
-              value={key}
-              onChange={(e) => setKey(e.target.value)}
+              value={keyInput}
+              onChange={(e) => setKeyInput(e.target.value)}
               className="w-full border border-slate-300 rounded-xl px-3 py-2 font-mono"
             />
           </div>
         </div>
         <button
           type="button"
-          onClick={() => onUpdateCredentials(url, key)}
-          className="px-4 py-2 rounded-xl bg-emerald-700 text-white text-xs font-bold"
+          onClick={() => onUpdateCredentials(urlInput.trim(), keyInput.trim())}
+          className="px-4 py-2 rounded-xl bg-emerald-700 text-white font-bold"
         >
-          Perbarui Koneksi Supabase
+          Simpan Kredensial Supabase
         </button>
       </div>
+
       <form
-        onSubmit={handleCreateAccount}
+        onSubmit={handleCreateStaffAccount}
         className="bg-white border border-slate-200 rounded-2xl p-5 space-y-3"
       >
-        <h2 className="text-sm font-extrabold text-slate-900">Tambah Akun Pengguna Baru</h2>
-        <div className="grid grid-cols-1 sm:grid-cols-5 gap-3 text-xs items-end">
-          <input
-            type="text"
-            required
-            placeholder="Nama Lengkap"
-            value={newName}
-            onChange={(e) => setNewName(e.target.value)}
-            className="border border-slate-300 rounded-xl px-3 py-2"
-          />
-          <input
-            type="text"
-            required
-            placeholder="Username / NISN / NIP"
-            value={newUser}
-            onChange={(e) => setNewUser(e.target.value)}
-            className="border border-slate-300 rounded-xl px-3 py-2"
-          />
-          <input
-            type="email"
-            required
-            placeholder="Email Login"
-            value={newEmail}
-            onChange={(e) => setNewEmail(e.target.value)}
-            className="border border-slate-300 rounded-xl px-3 py-2"
-          />
-          <input
-            type="password"
-            required
-            minLength={6}
-            placeholder="Password"
-            value={newPass}
-            onChange={(e) => setNewPass(e.target.value)}
-            className="border border-slate-300 rounded-xl px-3 py-2"
-          />
-          <div className="flex gap-2">
+        <h2 className="text-sm font-extrabold text-slate-900">
+          Tambah Akun Petugas / Guru / Admin
+        </h2>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+          <div>
+            <label className="block font-bold text-slate-700 mb-1">Peran</label>
             <select
               value={newRole}
               onChange={(e) => setNewRole(e.target.value)}
-              className="border border-slate-300 rounded-xl px-2 py-2"
+              className="w-full border border-slate-300 rounded-xl px-3 py-2"
             >
               <option value="GURU">GURU</option>
               <option value="ADMIN">ADMIN</option>
             </select>
-            <button
-              type="submit"
-              className="px-3 py-2 rounded-xl bg-emerald-700 text-white font-bold"
-            >
-              Buat
-            </button>
+          </div>
+          <div>
+            <label className="block font-bold text-slate-700 mb-1">Nama Lengkap</label>
+            <input
+              type="text"
+              required
+              value={newName}
+              onChange={(e) => setNewName(e.target.value)}
+              className="w-full border border-slate-300 rounded-xl px-3 py-2"
+            />
+          </div>
+          <div>
+            <label className="block font-bold text-slate-700 mb-1">Username</label>
+            <input
+              type="text"
+              required
+              value={newUsername}
+              onChange={(e) => setNewUsername(e.target.value)}
+              className="w-full border border-slate-300 rounded-xl px-3 py-2"
+            />
+          </div>
+          <div>
+            <label className="block font-bold text-slate-700 mb-1">Email</label>
+            <input
+              type="email"
+              required
+              value={newEmail}
+              onChange={(e) => setNewEmail(e.target.value)}
+              className="w-full border border-slate-300 rounded-xl px-3 py-2"
+            />
+          </div>
+          <div>
+            <label className="block font-bold text-slate-700 mb-1">Password (Min. 8)</label>
+            <input
+              type="password"
+              required
+              minLength={8}
+              value={newPassword}
+              onChange={(e) => setNewPassword(e.target.value)}
+              className="w-full border border-slate-300 rounded-xl px-3 py-2"
+            />
           </div>
         </div>
+        <button
+          type="submit"
+          className="px-4 py-2 rounded-xl bg-emerald-700 text-white font-bold"
+        >
+          Daftarkan Akun Baru
+        </button>
       </form>
-      <div className="bg-white border border-slate-200 rounded-2xl overflow-x-auto">
+
+      <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
         <table className="w-full text-xs">
           <thead className="bg-slate-50 border-b border-slate-200 font-bold text-slate-700">
             <tr>
@@ -6220,8 +6511,9 @@ function AdminSettingsView({
     </div>
   );
 }
+
 // ============================================================================
-// EKSPOR DEFAULT TERBUNGKUS ERROR BOUNDARY
+// EKSPOR DEFAULT DENGAN ERROR BOUNDARY
 // ============================================================================
 export default function App() {
   return (
