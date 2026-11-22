@@ -37,7 +37,6 @@ import {
   Copy,
   Pencil
 } from "lucide-react";
-
 // ============================================================================
 // KLIEN SUPABASE REST & AUTH (TANPA DEPENDENSI BUNDLER EKSTERNAL)
 // ============================================================================
@@ -185,7 +184,6 @@ class SupabaseRestQueryBuilder {
     return this.execute().then(resolve, reject);
   }
 }
-
 function createSupabaseClient(url, anonKey, options = {}) {
   const cleanUrl = String(url || "").trim().replace(/\/+$/, "");
   const cleanKey = String(anonKey || "").trim();
@@ -297,7 +295,6 @@ function createSupabaseClient(url, anonKey, options = {}) {
     }
   };
 }
-
 // ============================================================================
 // KONFIGURASI SUPABASE & TEMPLATE DOKUMEN TERPUSAT MIN 4 MAGELANG
 // ============================================================================
@@ -389,7 +386,6 @@ const MENU_CONFIG = {
     { id: "student_history", label: "Riwayat & Nilai", icon: History }
   ]
 };
-
 // ============================================================================
 // UTILITAS SPREADSHEET (.XLSX / .CSV), EXCELJS & TEMPLATE DOKUMEN TERPUSAT
 // ============================================================================
@@ -800,7 +796,6 @@ const exportOfficialExcelWithKop = async ({
   document.body.removeChild(a);
   URL.revokeObjectURL(url);
 };
-
 // ============================================================================
 // MESIN KOREKSI OTOMATIS & EVALUASI NILAI
 // ============================================================================
@@ -859,7 +854,6 @@ const evaluateSingleQuestionAnswer = (question, studentAnswer, formula = DEFAULT
   const ok = rawAns.toLowerCase() === rawKey.toLowerCase();
   return { status: ok ? "CORRECT" : "WRONG", earnedWeight: ok ? maxWeight : 0, maxWeight };
 };
-
 // ============================================================================
 // KOMPONEN ERROR BOUNDARY & HELPER UI
 // ============================================================================
@@ -914,7 +908,6 @@ function AccessDeniedView({ role, onBack }) {
     </div>
   );
 }
-
 // ============================================================================
 // KOMPONEN UTAMA APLIKASI CBT MIN 4 MAGELANG
 // ============================================================================
@@ -966,14 +959,12 @@ function CbtMin4MagelangApp() {
   const [attempts, setAttempts] = useState([]);
   const [studentAnswers, setStudentAnswers] = useState([]);
   const [examResults, setExamResults] = useState([]);
-
   const showBanner = (type, message) => {
     setBanner({ type, message });
     setTimeout(() => {
       setBanner((prev) => (prev?.message === message ? null : prev));
     }, 6000);
   };
-
   useEffect(() => {
     let mounted = true;
     const initAuthAndAdminCheck = async () => {
@@ -1015,7 +1006,6 @@ function CbtMin4MagelangApp() {
       mounted = false;
     };
   }, [supabase]);
-
   const refreshAllData = async () => {
     if (!supabase) return;
     try {
@@ -1090,14 +1080,12 @@ function CbtMin4MagelangApp() {
       console.error("Refresh data error:", err);
     }
   };
-
   useEffect(() => {
     refreshAllData();
     if (!currentUser || !supabase) return;
     const timer = setInterval(refreshAllData, 15000);
     return () => clearInterval(timer);
   }, [supabase, currentUser, isSimulationMode]);
-
   const handleInitialAdminSetup = async (e) => {
     e.preventDefault();
     if (!supabase) return showBanner("error", "Koneksi Supabase belum terkonfigurasi.");
@@ -1138,7 +1126,6 @@ function CbtMin4MagelangApp() {
       showBanner("error", `Setup Administrator gagal: ${err.message}`);
     }
   };
-
   const handleLoginSubmit = async (e) => {
     e.preventDefault();
     if (!supabase) return showBanner("error", "Koneksi Supabase belum terkonfigurasi.");
@@ -1254,31 +1241,6 @@ function CbtMin4MagelangApp() {
       showBanner("error", `Login gagal: ${err.message}`);
     }
   };
-
-  const enterSimulationSandbox = (role) => {
-    const simUser = {
-      id: `sim-${role.toLowerCase()}-001`,
-      full_name:
-        role === "ADMIN"
-          ? "Administrator Simulasi"
-          : role === "GURU"
-            ? "Guru Penguji Simulasi"
-            : "Siswa Peserta Simulasi",
-      username: `sim_${role.toLowerCase()}`,
-      email: `sim.${role.toLowerCase()}@min4magelang.sch.id`,
-      role,
-      is_active: true,
-      is_simulation: true
-    };
-    setCurrentUser(simUser);
-    setIsSimulationMode(true);
-    setActiveMenu("dashboard");
-    showBanner(
-      "warning",
-      `Mode SIMULASI (${role}) aktif. Data terisolasi sepenuhnya dari data produksi madrasah.`
-    );
-  };
-
   const handleLogout = async () => {
     if (supabase && !isSimulationMode) {
       await supabase.auth.signOut();
@@ -1289,7 +1251,6 @@ function CbtMin4MagelangApp() {
     setLoginPassword("");
     setActiveMenu("dashboard");
   };
-
   if (authLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-slate-50 text-slate-700 text-sm font-semibold">
@@ -1297,12 +1258,11 @@ function CbtMin4MagelangApp() {
       </div>
     );
   }
-
   if (!currentUser) {
     return (
       <div className="min-h-screen bg-slate-100 flex flex-col justify-center items-center p-4">
-        <div className="max-w-xl w-full bg-white border border-slate-200 rounded-3xl shadow-sm overflow-hidden">
-          <div className="bg-emerald-800 text-white p-6 text-center space-y-1">
+        <div className="max-w-lg w-full bg-white border border-slate-200 rounded-3xl shadow-sm overflow-hidden">
+          <div className="bg-emerald-800 text-white px-6 py-5 text-center space-y-1">
             <h1 className="text-xl font-extrabold tracking-tight">
               {schoolSettings.app_name || "CBT MIN 4 MAGELANG"}
             </h1>
@@ -1388,34 +1348,46 @@ function CbtMin4MagelangApp() {
                 </div>
                 <button
                   type="submit"
-                  className="w-full py-2.5 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-extrabold"
+                  className="w-full py-2.5 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-extrabold transition"
                 >
                   Simpan & Aktifkan Administrator Utama
                 </button>
               </form>
             ) : (
-              <>
-                <div className="grid grid-cols-3 gap-2 bg-slate-100 p-1 rounded-xl">
-                  {["ADMIN", "GURU", "SISWA"].map((role) => (
-                    <button
-                      key={role}
-                      type="button"
-                      onClick={() => {
-                        setLoginRoleTab(role);
-                        setLoginIdentifier("");
-                        setLoginPassword("");
-                      }}
-                      className={`py-2 rounded-lg text-xs font-extrabold transition ${
-                        loginRoleTab === role
-                          ? "bg-emerald-700 text-white shadow-sm"
-                          : "text-slate-600 hover:text-slate-900"
-                      }`}
-                    >
-                      {role}
-                    </button>
-                  ))}
+              <div className="space-y-4">
+                <div className="space-y-1.5">
+                  <span className="block text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                    Pilih Peran Masuk
+                  </span>
+                  <div className="grid grid-cols-3 gap-1.5 bg-slate-100 border border-slate-200 p-1.5 rounded-2xl">
+                    {[
+                      { id: "ADMIN", label: "Admin" },
+                      { id: "GURU", label: "Guru" },
+                      { id: "SISWA", label: "Siswa" }
+                    ].map((roleItem) => {
+                      const active = loginRoleTab === roleItem.id;
+                      return (
+                        <button
+                          key={roleItem.id}
+                          type="button"
+                          onClick={() => {
+                            setLoginRoleTab(roleItem.id);
+                            setLoginIdentifier("");
+                            setLoginPassword("");
+                          }}
+                          className={`py-2 px-3 rounded-xl text-xs font-extrabold transition ${
+                            active
+                              ? "bg-emerald-700 text-white shadow-sm"
+                              : "text-slate-600 hover:bg-white/70 hover:text-slate-900"
+                          }`}
+                        >
+                          {roleItem.label}
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
-                <form onSubmit={handleLoginSubmit} className="space-y-3" autoComplete="off">
+                <form onSubmit={handleLoginSubmit} className="space-y-3.5" autoComplete="off">
                   <div>
                     <label className="block text-xs font-bold text-slate-700 mb-1">
                       {loginRoleTab === "SISWA"
@@ -1431,7 +1403,7 @@ function CbtMin4MagelangApp() {
                       required
                       value={loginIdentifier}
                       onChange={(e) => setLoginIdentifier(e.target.value)}
-                      className="w-full border border-slate-300 rounded-xl px-3 py-2.5 text-xs"
+                      className="w-full border border-slate-300 focus:border-emerald-600 focus:ring-2 focus:ring-emerald-600/15 outline-none rounded-xl px-3 py-2.5 text-xs transition"
                     />
                   </div>
                   <div>
@@ -1443,38 +1415,24 @@ function CbtMin4MagelangApp() {
                       required
                       value={loginPassword}
                       onChange={(e) => setLoginPassword(e.target.value)}
-                      className="w-full border border-slate-300 rounded-xl px-3 py-2.5 text-xs"
+                      className="w-full border border-slate-300 focus:border-emerald-600 focus:ring-2 focus:ring-emerald-600/15 outline-none rounded-xl px-3 py-2.5 text-xs transition"
                     />
                   </div>
                   <button
                     type="submit"
-                    className="w-full py-2.5 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-extrabold"
+                    className="w-full py-2.5 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-extrabold transition shadow-sm"
                   >
-                    Masuk sebagai {loginRoleTab}
+                    Masuk sebagai{" "}
+                    {loginRoleTab === "ADMIN"
+                      ? "Admin"
+                      : loginRoleTab === "GURU"
+                        ? "Guru"
+                        : "Siswa"}
                   </button>
                 </form>
-              </>
-            )}
-            {loginRoleTab === "ADMIN" && (
-              <div className="border-t border-slate-200 pt-4 space-y-2">
-                <div className="text-[11px] font-bold text-slate-500 text-center">
-                  Ruang Pengujian Terisolasi (Label SIMULASI — Terpisah dari Data Produksi)
-                </div>
-                <div className="grid grid-cols-3 gap-2">
-                  {["ADMIN", "GURU", "SISWA"].map((r) => (
-                    <button
-                      key={r}
-                      type="button"
-                      onClick={() => enterSimulationSandbox(r)}
-                      className="py-2 px-2 rounded-xl border border-amber-300 bg-amber-50 hover:bg-amber-100 text-amber-900 text-[11px] font-bold"
-                    >
-                      Simulasi {r}
-                    </button>
-                  ))}
-                </div>
               </div>
             )}
-            <div className="flex items-center justify-between text-[11px] text-slate-500 pt-1">
+            <div className="flex items-center justify-between text-[11px] text-slate-500 pt-2 border-t border-slate-100">
               <span>Supabase: {supabase ? "Terhubung" : "Belum Terhubung"}</span>
               <button
                 type="button"
@@ -1524,11 +1482,9 @@ function CbtMin4MagelangApp() {
       </div>
     );
   }
-
   const userRole = currentUser.role || "SISWA";
   const allowedMenus = MENU_CONFIG[userRole] || MENU_CONFIG.SISWA;
   const isMenuAllowed = allowedMenus.some((m) => m.id === activeMenu);
-
   const renderActiveContent = () => {
     if (!isMenuAllowed) {
       return <AccessDeniedView role={userRole} onBack={() => setActiveMenu("dashboard")} />;
@@ -1787,7 +1743,6 @@ function CbtMin4MagelangApp() {
         return null;
     }
   };
-
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col md:flex-row">
       <aside
@@ -1892,7 +1847,7 @@ function CbtMin4MagelangApp() {
               banner.type === "error"
                 ? "bg-red-50 text-red-800 border-red-200"
                 : banner.type === "warning"
-                  ? "bg-amber-50 text-amber-900 border-red-200"
+                  ? "bg-amber-50 text-amber-900 border-amber-200"
                   : "bg-emerald-50 text-emerald-900 border-emerald-200"
             }`}
           >
@@ -1906,7 +1861,6 @@ function CbtMin4MagelangApp() {
     </div>
   );
 }
-
 // ============================================================================
 // MODUL 1: DASHBOARD UTAMA (ZERO MOCK DATA)
 // ============================================================================
@@ -1988,7 +1942,6 @@ function DashboardView({ user, isSimulation, schoolSettings, stats, onNavigate }
     </div>
   );
 }
-
 // ============================================================================
 // MODUL 2: IDENTITAS MADRASAH
 // ============================================================================
@@ -2147,7 +2100,6 @@ function SchoolIdentityView({ supabase, schoolSettings, onSaved, showBanner }) {
     </form>
   );
 }
-
 // ============================================================================
 // MODUL 3: MANAJEMEN KELAS, MAPEL, GURU & SISWA
 // ============================================================================
@@ -2375,7 +2327,6 @@ function ClassesManagerView({ supabase, classesList, students, isSimulation, onR
     </div>
   );
 }
-
 function SubjectsManagerView({ supabase, subjects, isSimulation, onRefresh, showBanner }) {
   const [code, setCode] = useState("");
   const [name, setName] = useState("");
@@ -2592,7 +2543,6 @@ function SubjectsManagerView({ supabase, subjects, isSimulation, onRefresh, show
     </div>
   );
 }
-
 function TeachersManagerView({ supabase, teachers, subjects, isSimulation, onRefresh, showBanner }) {
   const [fullName, setFullName] = useState("");
   const [nip, setNip] = useState("");
@@ -2874,7 +2824,6 @@ function TeachersManagerView({ supabase, teachers, subjects, isSimulation, onRef
     </div>
   );
 }
-
 function StudentsManagerView({ supabase, students, classesList, isSimulation, onRefresh, showBanner }) {
   const [nis, setNis] = useState("");
   const [nisn, setNisn] = useState("");
@@ -3246,7 +3195,6 @@ function StudentsManagerView({ supabase, students, classesList, isSimulation, on
     </div>
   );
 }
-
 // ============================================================================
 // MODUL 4: BANK SOAL (TAMBAH, EDIT, TEMPLATE, IMPOR & CETAK BERKOP RESMI)
 // ============================================================================
@@ -3273,7 +3221,6 @@ function buildOptionsByType(qType, optA, optB, optC, optD) {
   }
   return [];
 }
-
 function QuestionBankManagerView({
   supabase,
   questions,
@@ -3309,7 +3256,6 @@ function QuestionBankManagerView({
   const [search, setSearch] = useState("");
   const [filterSubject, setFilterSubject] = useState("");
   const [importSummary, setImportSummary] = useState(null);
-
   const filteredQuestions = useMemo(
     () =>
       questions.filter((q) => {
@@ -3322,7 +3268,6 @@ function QuestionBankManagerView({
       }),
     [questions, filterSubject, search]
   );
-
   const openEditModal = (q) => {
     const opts = Array.isArray(q.options) ? q.options : [];
     const findOpt = (key) => opts.find((o) => String(o.key || "").toUpperCase() === key)?.text || "";
@@ -3338,7 +3283,6 @@ function QuestionBankManagerView({
     setEditCorrectAnswer(q.correct_answer || "");
     setEditWeight(Number(q.weight) || 1);
   };
-
   const handleUpdateQuestion = async (e) => {
     e.preventDefault();
     if (!supabase || !editingQuestion) return;
@@ -3376,7 +3320,6 @@ function QuestionBankManagerView({
       setSavingEdit(false);
     }
   };
-
   const handleDownloadQuestionTemplate = async () => {
     const sampleSubject = subjects[0]?.name || "Matematika";
     await downloadXlsxTemplateFile("Template_Bank_Soal_MIN4.xlsx", "Bank_Soal", [
@@ -3409,7 +3352,6 @@ function QuestionBankManagerView({
     ]);
     showBanner("success", "Template Bank Soal (.xlsx) berhasil diunduh.");
   };
-
   const handleImportQuestionsFile = async (e) => {
     const file = e.target.files?.[0];
     e.target.value = "";
@@ -3500,7 +3442,6 @@ function QuestionBankManagerView({
       showBanner("error", `Gagal mengimpor Bank Soal: ${err.message}`);
     }
   };
-
   const handleSaveQuestion = async (e) => {
     e.preventDefault();
     if (!supabase || !questionText.trim()) return;
@@ -3527,14 +3468,12 @@ function QuestionBankManagerView({
     await onRefresh();
     showBanner("success", "Butir soal berhasil disimpan ke Bank Soal.");
   };
-
   const handleDelete = async (id) => {
     const { error } = await supabase.from("questions").delete().eq("id", id);
     if (error) return showBanner("error", error.message);
     await onRefresh();
     showBanner("success", "Butir soal dihapus.");
   };
-
   const handlePrintBankSoal = (includeKey = false) => {
     if (filteredQuestions.length === 0) {
       return showBanner("error", "Belum ada soal pada filter ini untuk dicetak.");
@@ -3577,7 +3516,6 @@ function QuestionBankManagerView({
     });
     openPrintDocumentWindow(html);
   };
-
   return (
     <div className="space-y-4">
       <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm space-y-4">
@@ -3982,7 +3920,6 @@ function QuestionBankManagerView({
     </div>
   );
 }
-
 // ============================================================================
 // MODUL 5: JADWAL UJIAN & CETAK NASKAH SOAL BERKOP RESMI
 // ============================================================================
@@ -4010,24 +3947,20 @@ function ExamsManagerView({
     "Berdoalah sebelum mengerjakan ujian. Pilihlah jawaban yang paling tepat."
   );
   const [selectedQuestionIds, setSelectedQuestionIds] = useState([]);
-
   const availableQuestions = useMemo(
     () => questions.filter((q) => !subjectId || q.subject_id === subjectId),
     [questions, subjectId]
   );
-
   const allQuestionIds = useMemo(
     () => availableQuestions.map((q) => q.id),
     [availableQuestions]
   );
-
   const isAllSelected = useMemo(
     () =>
       allQuestionIds.length > 0 &&
       allQuestionIds.every((id) => selectedQuestionIds.includes(id)),
     [allQuestionIds, selectedQuestionIds]
   );
-
   const handleToggleSelectAllQuestions = () => {
     if (isAllSelected) {
       setSelectedQuestionIds((prev) => prev.filter((id) => !allQuestionIds.includes(id)));
@@ -4035,13 +3968,11 @@ function ExamsManagerView({
       setSelectedQuestionIds((prev) => Array.from(new Set([...prev, ...allQuestionIds])));
     }
   };
-
   const toggleQuestionSelect = (id) => {
     setSelectedQuestionIds((prev) =>
       prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]
     );
   };
-
   const handleCreateExam = async (e) => {
     e.preventDefault();
     if (!supabase) return;
@@ -4070,7 +4001,6 @@ function ExamsManagerView({
     await onRefresh();
     showBanner("success", "Paket jadwal ujian berhasil dibuat.");
   };
-
   const handlePrintNaskahSoal = (exam) => {
     const qIds = Array.isArray(exam.question_ids) ? exam.question_ids : [];
     const examQuestions = qIds
@@ -4125,7 +4055,6 @@ function ExamsManagerView({
     });
     openPrintDocumentWindow(html);
   };
-
   return (
     <div className="space-y-4">
       <form
@@ -4320,7 +4249,6 @@ function ExamsManagerView({
     </div>
   );
 }
-
 // ============================================================================
 // MODUL 6: PESERTA UJIAN & DAFTAR HADIR BERKOP RESMI
 // ============================================================================
@@ -4551,7 +4479,6 @@ function ParticipantsManagerView({
     </div>
   );
 }
-
 // ============================================================================
 // MODUL 7: PORTAL UJIAN SISWA (TIMER, SIMPAN OTOMATIS & PENYERAHAN)
 // ============================================================================
@@ -4577,7 +4504,6 @@ function StudentExamPortalView({
   const [flaggedMap, setFlaggedMap] = useState({});
   const [secondsLeft, setSecondsLeft] = useState(0);
   const [confirmFinishOpen, setConfirmFinishOpen] = useState(false);
-
   const myExams = useMemo(() => {
     if (isSimulation) return exams.filter((e) => e.status === "AKTIF");
     const myPartExamIds = new Set(
@@ -4592,13 +4518,11 @@ function StudentExamPortalView({
     );
     return exams.filter((e) => myPartExamIds.has(e.id));
   }, [exams, participants, currentUser, isSimulation]);
-
   const activeQuestions = useMemo(() => {
     if (!activeExam) return [];
     const qIds = Array.isArray(activeExam.question_ids) ? activeExam.question_ids : [];
     return qIds.map((id) => questions.find((q) => q.id === id)).filter(Boolean);
   }, [activeExam, questions]);
-
   useEffect(() => {
     if (!activeExam) return;
     const interval = setInterval(() => {
@@ -4613,7 +4537,6 @@ function StudentExamPortalView({
     }, 1000);
     return () => clearInterval(interval);
   }, [activeExam]);
-
   const handleStartExam = (exam) => {
     const storageKey = `cbt_min4_ans_${exam.id}_${currentUser.id}`;
     const savedLocal = localStorage.getItem(storageKey);
@@ -4630,7 +4553,6 @@ function StudentExamPortalView({
     setSecondsLeft((Number(exam.duration_minutes) || 60) * 60);
     setActiveExam(exam);
   };
-
   const handleSelectAnswer = async (questionId, value) => {
     const updated = { ...answersMap, [questionId]: value };
     setAnswersMap(updated);
@@ -4652,7 +4574,6 @@ function StudentExamPortalView({
       }
     }
   };
-
   const handleSubmitExam = async (isAuto = false) => {
     if (!activeExam) return;
     setConfirmFinishOpen(false);
@@ -4714,7 +4635,6 @@ function StudentExamPortalView({
         : "Ujian berhasil diselesaikan dan jawaban tersimpan."
     );
   };
-
   if (activeExam) {
     const q = activeQuestions[currentIndex];
     const mins = Math.floor(secondsLeft / 60);
@@ -4880,7 +4800,6 @@ function StudentExamPortalView({
       </div>
     );
   }
-
   if (mode === "student_history") {
     const myResults = examResults.filter((r) => r.student_id === currentUser.id);
     return (
@@ -4916,7 +4835,6 @@ function StudentExamPortalView({
       </div>
     );
   }
-
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
       {myExams.length === 0 ? (
@@ -4964,7 +4882,6 @@ function StudentExamPortalView({
     </div>
   );
 }
-
 // ============================================================================
 // MODUL 8: HASIL UJIAN, KOREKSI OTOMATIS & KONFIGURASI RUMUS
 // ============================================================================
@@ -5156,7 +5073,6 @@ function ResultsAndGradingView({
     </div>
   );
 }
-
 // ============================================================================
 // MODUL 9: ANALISIS BUTIR SOAL (TINGKAT KESUKARAN & DAYA PEMBEDA)
 // ============================================================================
@@ -5360,7 +5276,6 @@ function ItemAnalysisView({
     </div>
   );
 }
-
 // ============================================================================
 // MODUL 10: LAPORAN RESMI MADRASAH (PDF, EXCEL BERKOP, WORD & CSV)
 // ============================================================================
@@ -5582,7 +5497,6 @@ function OfficialReportsView({
     </div>
   );
 }
-
 // ============================================================================
 // MODUL 11: PENGATURAN DOKUMEN TERPUSAT (KOP SURAT RESMI MIN 4 MAGELANG)
 // ============================================================================
@@ -5739,7 +5653,6 @@ function DocumentSettingsView({
     </div>
   );
 }
-
 // ============================================================================
 // MODUL 12: BACKUP DATA & PENGATURAN AKUN / SUPABASE
 // ============================================================================
@@ -5783,7 +5696,6 @@ function BackupDataView({ isSimulation, payload, showBanner }) {
     </div>
   );
 }
-
 function AdminSettingsView({
   supabase,
   supabaseUrl,
@@ -5950,7 +5862,6 @@ function AdminSettingsView({
     </div>
   );
 }
-
 // ============================================================================
 // EKSPOR DEFAULT TERBUNGKUS ERROR BOUNDARY
 // ============================================================================
