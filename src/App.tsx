@@ -356,7 +356,6 @@ create table if not exists public.exam_participants (id uuid primary key default
 create table if not exists public.exam_attempts (id uuid primary key default gen_random_uuid(), exam_id uuid references public.exams(id) on delete cascade, student_id text not null, student_name text not null, answers jsonb not null default '{}'::jsonb, status text not null default 'SELESAI', is_simulation boolean not null default false, submitted_at timestamptz not null default now());
 create table if not exists public.student_answers (id text primary key, exam_id uuid references public.exams(id) on delete cascade, student_id text not null, question_id uuid references public.questions(id) on delete cascade, answer text, is_simulation boolean not null default false, updated_at timestamptz not null default now());
 create table if not exists public.exam_results (id text primary key, exam_id uuid references public.exams(id) on delete cascade, exam_title text, student_id text not null, student_name text not null, score numeric not null default 0, correct_count integer not null default 0, wrong_count integer not null default 0, empty_count integer not null default 0, is_simulation boolean not null default false, updated_at timestamptz not null default now());`;
-
 const MENU_CONFIG = {
   ADMIN: [
     { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -414,7 +413,6 @@ const loadExternalScript = (src) =>
     script.onerror = () => reject(new Error(`Gagal memuat ${src}`));
     document.head.appendChild(script);
   });
-
 const ensureXlsxLoaded = async () => {
   if (typeof window !== "undefined" && window.XLSX) {
     return window.XLSX?.default || window.XLSX;
@@ -422,7 +420,6 @@ const ensureXlsxLoaded = async () => {
   await loadExternalScript("https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js");
   return window.XLSX?.default || window.XLSX;
 };
-
 const ensureExcelJsLoaded = async () => {
   if (typeof window !== "undefined" && window.ExcelJS) {
     return window.ExcelJS?.default || window.ExcelJS;
@@ -430,7 +427,6 @@ const ensureExcelJsLoaded = async () => {
   await loadExternalScript("https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js");
   return window.ExcelJS?.default || window.ExcelJS;
 };
-
 const downloadXlsxTemplateFile = async (filename, sheetName, sampleRows) => {
   const XLSX = await ensureXlsxLoaded();
   const ws = XLSX.utils.json_to_sheet(sampleRows);
@@ -438,7 +434,6 @@ const downloadXlsxTemplateFile = async (filename, sheetName, sampleRows) => {
   XLSX.utils.book_append_sheet(wb, ws, sheetName);
   XLSX.writeFile(wb, filename.endsWith(".xlsx") ? filename : `${filename}.xlsx`);
 };
-
 const parseSpreadsheetFile = async (file) => {
   const XLSX = await ensureXlsxLoaded();
   const buffer = await file.arrayBuffer();
@@ -446,7 +441,6 @@ const parseSpreadsheetFile = async (file) => {
   const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
   return XLSX.utils.sheet_to_json(firstSheet, { defval: "" });
 };
-
 const normalizeRowKeys = (row) => {
   const out = {};
   Object.entries(row || {}).forEach(([k, v]) => {
@@ -455,21 +449,18 @@ const normalizeRowKeys = (row) => {
   });
   return out;
 };
-
 const escapeHtml = (str) =>
   String(str ?? "")
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;");
-
 const getFormattedPrintDate = () =>
   new Date().toLocaleDateString("id-ID", {
     day: "2-digit",
     month: "long",
     year: "numeric"
   });
-
 const buildOfficialDocumentHtml = ({
   title,
   subtitle = "",
@@ -660,7 +651,6 @@ const buildOfficialDocumentHtml = ({
 </body>
 </html>`;
 };
-
 const openPrintDocumentWindow = (htmlContent) => {
   if (typeof window === "undefined") return false;
   const win = window.open("", "_blank", "width=960,height=760");
@@ -674,7 +664,6 @@ const openPrintDocumentWindow = (htmlContent) => {
   }, 450);
   return true;
 };
-
 const downloadWordDocFile = (filename, htmlContent) => {
   const blob = new Blob(["\ufeff", htmlContent], { type: "application/msword;charset=utf-8" });
   const url = URL.createObjectURL(blob);
@@ -686,7 +675,6 @@ const downloadWordDocFile = (filename, htmlContent) => {
   document.body.removeChild(a);
   URL.revokeObjectURL(url);
 };
-
 const fetchImageAsBase64 = async (src) => {
   if (!src) return null;
   if (src.startsWith("data:image/")) return src;
@@ -702,7 +690,6 @@ const fetchImageAsBase64 = async (src) => {
     return null;
   }
 };
-
 const exportOfficialExcelWithKop = async ({
   filename,
   sheetName = "Laporan",
@@ -905,12 +892,10 @@ class ErrorBoundary extends React.Component {
     return this.props.children;
   }
 }
-
 const renderSafeIcon = (IconComp, className = "w-4 h-4") => {
   if (!IconComp) return null;
   return <IconComp className={className} />;
 };
-
 function AccessDeniedView({ role, onBack }) {
   return (
     <div className="bg-white border border-red-200 rounded-2xl p-8 text-center space-y-3">
@@ -1213,6 +1198,8 @@ function CbtMin4MagelangApp() {
           is_simulation: false
         };
         setFailedAttempts(0);
+        setLoginIdentifier("");
+        setLoginPassword("");
         setCurrentUser(studentProfile);
         setIsSimulationMode(false);
         setActiveMenu("dashboard");
@@ -1251,6 +1238,8 @@ function CbtMin4MagelangApp() {
         throw new Error(`Akun ini terdaftar sebagai ${prof.role}, bukan ${loginRoleTab}.`);
       }
       setFailedAttempts(0);
+      setLoginIdentifier("");
+      setLoginPassword("");
       setCurrentUser(prof);
       setIsSimulationMode(Boolean(prof.is_simulation));
       setActiveMenu("dashboard");
@@ -1296,6 +1285,7 @@ function CbtMin4MagelangApp() {
     }
     setCurrentUser(null);
     setIsSimulationMode(false);
+    setLoginIdentifier("");
     setLoginPassword("");
     setActiveMenu("dashboard");
   };
@@ -1335,7 +1325,7 @@ function CbtMin4MagelangApp() {
           )}
           <div className="p-6 space-y-5">
             {!hasProductionAdmin ? (
-              <form onSubmit={handleInitialAdminSetup} className="space-y-3">
+              <form onSubmit={handleInitialAdminSetup} className="space-y-3" autoComplete="off">
                 <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3 text-xs text-emerald-900">
                   <strong>Setup Administrator Utama:</strong> Belum ditemukan akun Administrator
                   produksi di database Supabase. Silakan daftarkan Administrator Utama pertama.
@@ -1347,6 +1337,7 @@ function CbtMin4MagelangApp() {
                   <input
                     type="text"
                     required
+                    autoComplete="off"
                     value={setupName}
                     onChange={(e) => setSetupName(e.target.value)}
                     placeholder="Contoh: Operator CBT MIN 4 Magelang"
@@ -1359,6 +1350,7 @@ function CbtMin4MagelangApp() {
                     <input
                       type="text"
                       required
+                      autoComplete="off"
                       value={setupUsername}
                       onChange={(e) => setSetupUsername(e.target.value)}
                       placeholder="admin.min4"
@@ -1372,6 +1364,7 @@ function CbtMin4MagelangApp() {
                     <input
                       type="email"
                       required
+                      autoComplete="off"
                       value={setupEmail}
                       onChange={(e) => setSetupEmail(e.target.value)}
                       placeholder="admin@min4magelang.sch.id"
@@ -1387,6 +1380,7 @@ function CbtMin4MagelangApp() {
                     type="password"
                     required
                     minLength={8}
+                    autoComplete="new-password"
                     value={setupPassword}
                     onChange={(e) => setSetupPassword(e.target.value)}
                     className="w-full border border-slate-300 rounded-xl px-3 py-2 text-xs"
@@ -1406,7 +1400,11 @@ function CbtMin4MagelangApp() {
                     <button
                       key={role}
                       type="button"
-                      onClick={() => setLoginRoleTab(role)}
+                      onClick={() => {
+                        setLoginRoleTab(role);
+                        setLoginIdentifier("");
+                        setLoginPassword("");
+                      }}
                       className={`py-2 rounded-lg text-xs font-extrabold transition ${
                         loginRoleTab === role
                           ? "bg-emerald-700 text-white shadow-sm"
@@ -1417,7 +1415,7 @@ function CbtMin4MagelangApp() {
                     </button>
                   ))}
                 </div>
-                <form onSubmit={handleLoginSubmit} className="space-y-3">
+                <form onSubmit={handleLoginSubmit} className="space-y-3" autoComplete="off">
                   <div>
                     <label className="block text-xs font-bold text-slate-700 mb-1">
                       {loginRoleTab === "SISWA"
@@ -1428,6 +1426,8 @@ function CbtMin4MagelangApp() {
                     </label>
                     <input
                       type="text"
+                      name={`cbt_login_id_${loginRoleTab.toLowerCase()}`}
+                      autoComplete="off"
                       required
                       value={loginIdentifier}
                       onChange={(e) => setLoginIdentifier(e.target.value)}
@@ -1438,6 +1438,8 @@ function CbtMin4MagelangApp() {
                     <label className="block text-xs font-bold text-slate-700 mb-1">Password</label>
                     <input
                       type="password"
+                      name={`cbt_login_pass_${loginRoleTab.toLowerCase()}`}
+                      autoComplete="new-password"
                       required
                       value={loginPassword}
                       onChange={(e) => setLoginPassword(e.target.value)}
@@ -3292,8 +3294,6 @@ function QuestionBankManagerView({
   const [optD, setOptD] = useState("");
   const [correctAnswer, setCorrectAnswer] = useState("A");
   const [weight, setWeight] = useState(1);
-
-  // State Modal Edit Soal
   const [editingQuestion, setEditingQuestion] = useState(null);
   const [editSubjectId, setEditSubjectId] = useState("");
   const [editTopic, setEditTopic] = useState("");
@@ -3306,7 +3306,6 @@ function QuestionBankManagerView({
   const [editCorrectAnswer, setEditCorrectAnswer] = useState("");
   const [editWeight, setEditWeight] = useState(1);
   const [savingEdit, setSavingEdit] = useState(false);
-
   const [search, setSearch] = useState("");
   const [filterSubject, setFilterSubject] = useState("");
   const [importSummary, setImportSummary] = useState(null);
@@ -3752,7 +3751,6 @@ function QuestionBankManagerView({
           </div>
         </form>
       </div>
-
       <div className="flex flex-wrap gap-3">
         <div className="flex items-center gap-2 bg-white border border-slate-200 rounded-xl px-3 py-2 flex-1 min-w-[200px]">
           <Search className="w-4 h-4 text-slate-400" />
@@ -3777,7 +3775,6 @@ function QuestionBankManagerView({
           ))}
         </select>
       </div>
-
       <div className="space-y-2">
         {filteredQuestions.length === 0 ? (
           <div className="bg-white border border-slate-200 rounded-2xl p-6 text-center text-xs text-slate-500">
@@ -3840,8 +3837,6 @@ function QuestionBankManagerView({
           })
         )}
       </div>
-
-      {/* MODAL EDIT SOAL */}
       {editingQuestion && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50 overflow-y-auto">
           <div className="bg-white rounded-2xl max-w-2xl w-full p-5 space-y-4 shadow-lg my-auto">
@@ -3860,7 +3855,6 @@ function QuestionBankManagerView({
                 <X className="w-4 h-4" />
               </button>
             </div>
-
             <form onSubmit={handleUpdateQuestion} className="space-y-3 text-xs">
               <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
                 <div>
@@ -3913,7 +3907,6 @@ function QuestionBankManagerView({
                   />
                 </div>
               </div>
-
               <div>
                 <label className="block font-bold text-slate-700 mb-1">Pertanyaan Soal</label>
                 <textarea
@@ -3924,7 +3917,6 @@ function QuestionBankManagerView({
                   className="w-full border border-slate-300 rounded-xl px-3 py-2"
                 />
               </div>
-
               {(editType === "PG" || editType === "PG_KOMPLEKS") && (
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                   <input
@@ -3957,7 +3949,6 @@ function QuestionBankManagerView({
                   />
                 </div>
               )}
-
               <div>
                 <label className="block font-bold text-slate-700 mb-1">Kunci Jawaban</label>
                 <input
@@ -3968,7 +3959,6 @@ function QuestionBankManagerView({
                   className="w-full border border-slate-300 rounded-xl px-3 py-2"
                 />
               </div>
-
               <div className="flex justify-end gap-2 pt-2">
                 <button
                   type="button"
@@ -4020,15 +4010,38 @@ function ExamsManagerView({
     "Berdoalah sebelum mengerjakan ujian. Pilihlah jawaban yang paling tepat."
   );
   const [selectedQuestionIds, setSelectedQuestionIds] = useState([]);
+
   const availableQuestions = useMemo(
     () => questions.filter((q) => !subjectId || q.subject_id === subjectId),
     [questions, subjectId]
   );
+
+  const allQuestionIds = useMemo(
+    () => availableQuestions.map((q) => q.id),
+    [availableQuestions]
+  );
+
+  const isAllSelected = useMemo(
+    () =>
+      allQuestionIds.length > 0 &&
+      allQuestionIds.every((id) => selectedQuestionIds.includes(id)),
+    [allQuestionIds, selectedQuestionIds]
+  );
+
+  const handleToggleSelectAllQuestions = () => {
+    if (isAllSelected) {
+      setSelectedQuestionIds((prev) => prev.filter((id) => !allQuestionIds.includes(id)));
+    } else {
+      setSelectedQuestionIds((prev) => Array.from(new Set([...prev, ...allQuestionIds])));
+    }
+  };
+
   const toggleQuestionSelect = (id) => {
     setSelectedQuestionIds((prev) =>
       prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]
     );
   };
+
   const handleCreateExam = async (e) => {
     e.preventDefault();
     if (!supabase) return;
@@ -4057,6 +4070,7 @@ function ExamsManagerView({
     await onRefresh();
     showBanner("success", "Paket jadwal ujian berhasil dibuat.");
   };
+
   const handlePrintNaskahSoal = (exam) => {
     const qIds = Array.isArray(exam.question_ids) ? exam.question_ids : [];
     const examQuestions = qIds
@@ -4111,6 +4125,7 @@ function ExamsManagerView({
     });
     openPrintDocumentWindow(html);
   };
+
   return (
     <div className="space-y-4">
       <form
@@ -4202,6 +4217,28 @@ function ExamsManagerView({
           <div className="text-xs font-bold text-slate-700">
             Pilih Butir Soal dari Bank Soal ({selectedQuestionIds.length} terpilih):
           </div>
+          {availableQuestions.length > 0 && (
+            <div className="flex items-center justify-between rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs">
+              <label className="flex items-center gap-2 font-bold text-slate-800 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={isAllSelected}
+                  onChange={handleToggleSelectAllQuestions}
+                  className="h-4 w-4 rounded border-slate-300"
+                />
+                <span>Pilih Semua ({allQuestionIds.length} soal)</span>
+              </label>
+              {selectedQuestionIds.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setSelectedQuestionIds([])}
+                  className="text-[11px] font-bold text-red-600 hover:underline"
+                >
+                  Hapus Pilihan
+                </button>
+              )}
+            </div>
+          )}
           <div className="max-h-44 overflow-y-auto border border-slate-200 rounded-xl p-2 space-y-1 bg-slate-50">
             {availableQuestions.length === 0 ? (
               <div className="text-xs text-slate-500 p-2">
@@ -4540,6 +4577,7 @@ function StudentExamPortalView({
   const [flaggedMap, setFlaggedMap] = useState({});
   const [secondsLeft, setSecondsLeft] = useState(0);
   const [confirmFinishOpen, setConfirmFinishOpen] = useState(false);
+
   const myExams = useMemo(() => {
     if (isSimulation) return exams.filter((e) => e.status === "AKTIF");
     const myPartExamIds = new Set(
@@ -4554,11 +4592,13 @@ function StudentExamPortalView({
     );
     return exams.filter((e) => myPartExamIds.has(e.id));
   }, [exams, participants, currentUser, isSimulation]);
+
   const activeQuestions = useMemo(() => {
     if (!activeExam) return [];
     const qIds = Array.isArray(activeExam.question_ids) ? activeExam.question_ids : [];
     return qIds.map((id) => questions.find((q) => q.id === id)).filter(Boolean);
   }, [activeExam, questions]);
+
   useEffect(() => {
     if (!activeExam) return;
     const interval = setInterval(() => {
@@ -4573,6 +4613,7 @@ function StudentExamPortalView({
     }, 1000);
     return () => clearInterval(interval);
   }, [activeExam]);
+
   const handleStartExam = (exam) => {
     const storageKey = `cbt_min4_ans_${exam.id}_${currentUser.id}`;
     const savedLocal = localStorage.getItem(storageKey);
@@ -4589,6 +4630,7 @@ function StudentExamPortalView({
     setSecondsLeft((Number(exam.duration_minutes) || 60) * 60);
     setActiveExam(exam);
   };
+
   const handleSelectAnswer = async (questionId, value) => {
     const updated = { ...answersMap, [questionId]: value };
     setAnswersMap(updated);
@@ -4610,6 +4652,7 @@ function StudentExamPortalView({
       }
     }
   };
+
   const handleSubmitExam = async (isAuto = false) => {
     if (!activeExam) return;
     setConfirmFinishOpen(false);
@@ -4671,6 +4714,7 @@ function StudentExamPortalView({
         : "Ujian berhasil diselesaikan dan jawaban tersimpan."
     );
   };
+
   if (activeExam) {
     const q = activeQuestions[currentIndex];
     const mins = Math.floor(secondsLeft / 60);
@@ -4836,6 +4880,7 @@ function StudentExamPortalView({
       </div>
     );
   }
+
   if (mode === "student_history") {
     const myResults = examResults.filter((r) => r.student_id === currentUser.id);
     return (
@@ -4871,6 +4916,7 @@ function StudentExamPortalView({
       </div>
     );
   }
+
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
       {myExams.length === 0 ? (
@@ -5867,9 +5913,8 @@ function AdminSettingsView({
               onChange={(e) => setNewRole(e.target.value)}
               className="border border-slate-300 rounded-xl px-2 py-2"
             >
-              <option value="ADMIN">ADMIN</option>
               <option value="GURU">GURU</option>
-              <option value="SISWA">SISWA</option>
+              <option value="ADMIN">ADMIN</option>
             </select>
             <button
               type="submit"
@@ -5880,7 +5925,7 @@ function AdminSettingsView({
           </div>
         </div>
       </form>
-      <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
+      <div className="bg-white border border-slate-200 rounded-2xl overflow-x-auto">
         <table className="w-full text-xs">
           <thead className="bg-slate-50 border-b border-slate-200 font-bold text-slate-700">
             <tr>
@@ -5891,22 +5936,14 @@ function AdminSettingsView({
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
-            {profilesList.length === 0 ? (
-              <tr>
-                <td colSpan={4} className="p-6 text-center text-slate-500">
-                  Belum ada daftar akun pengguna.
-                </td>
+            {profilesList.map((p) => (
+              <tr key={p.id}>
+                <td className="p-3 font-bold">{p.full_name}</td>
+                <td className="p-3 font-mono">{p.username}</td>
+                <td className="p-3">{p.email}</td>
+                <td className="p-3 text-center font-bold text-emerald-800">{p.role}</td>
               </tr>
-            ) : (
-              profilesList.map((p) => (
-                <tr key={p.id}>
-                  <td className="p-3 font-bold">{p.full_name}</td>
-                  <td className="p-3 font-mono">{p.username}</td>
-                  <td className="p-3">{p.email}</td>
-                  <td className="p-3 text-center font-bold text-emerald-800">{p.role}</td>
-                </tr>
-              ))
-            )}
+            ))}
           </tbody>
         </table>
       </div>
@@ -5914,6 +5951,9 @@ function AdminSettingsView({
   );
 }
 
+// ============================================================================
+// EKSPOR DEFAULT TERBUNGKUS ERROR BOUNDARY
+// ============================================================================
 export default function App() {
   return (
     <ErrorBoundary>
