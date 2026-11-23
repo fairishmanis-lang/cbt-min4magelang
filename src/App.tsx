@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import {
-  BookOpen,
   FolderPlus,
   Folder,
   FileText,
@@ -16,12 +15,14 @@ import {
   Award,
   Layers,
   AlertCircle,
-  Sparkles,
   Image as ImageIcon,
   Save,
   X,
   ChevronRight,
-  School
+  School,
+  ShieldCheck,
+  UserCheck,
+  GraduationCap
 } from 'lucide-react';
 
 // ==========================================
@@ -40,8 +41,8 @@ interface SchoolIdentity {
 
 interface ClassRoom {
   id: string;
-  name: string; // Contoh: "VII A", "VIII B"
-  grade: string; // Contoh: "Kelas 7", "Kelas 8"
+  name: string;
+  grade: string;
 }
 
 interface UserAccount {
@@ -55,7 +56,7 @@ interface UserAccount {
 
 interface QuestionFolder {
   id: string;
-  title: string; // Nama Folder Soal baru, misal: "UH 1 Fiqih - Bab Thaharah"
+  title: string;
   subject: string;
   targetClasses: string[];
   description?: string;
@@ -71,7 +72,7 @@ interface QuestionOption {
 
 interface QuestionItem {
   id: string;
-  folderId: string; // Mengikat soal ke Folder Soal tertentu
+  folderId: string;
   type: 'multiple_choice' | 'essay';
   prompt: string;
   promptImage?: string;
@@ -85,8 +86,8 @@ interface ExamSchedule {
   id: string;
   title: string;
   subject: string;
-  folderIds: string[]; // Bisa mengambil dari satu atau beberapa Folder Soal
-  classIds: string[]; // Multi-kelas
+  folderIds: string[];
+  classIds: string[];
   durationMinutes: number;
   startTime: string;
   endTime: string;
@@ -172,13 +173,13 @@ const INITIAL_EXAMS: ExamSchedule[] = [
 ];
 
 const STORAGE_KEYS = {
-  SCHOOL: 'cbt_m4m_school_v2',
-  CLASSES: 'cbt_m4m_classes_v2',
-  USERS: 'cbt_m4m_users_v2',
-  FOLDERS: 'cbt_m4m_folders_v2',
-  QUESTIONS: 'cbt_m4m_questions_v2',
-  EXAMS: 'cbt_m4m_exams_v2',
-  SUBMISSIONS: 'cbt_m4m_submissions_v2'
+  SCHOOL: 'cbt_m4m_school_v3',
+  CLASSES: 'cbt_m4m_classes_v3',
+  USERS: 'cbt_m4m_users_v3',
+  FOLDERS: 'cbt_m4m_folders_v3',
+  QUESTIONS: 'cbt_m4m_questions_v3',
+  EXAMS: 'cbt_m4m_exams_v3',
+  SUBMISSIONS: 'cbt_m4m_submissions_v3'
 };
 
 function loadFromStorage<T>(key: string, fallback: T): T {
@@ -229,7 +230,8 @@ export function App() {
   const [exams, setExams] = useState<ExamSchedule[]>(() => loadFromStorage(STORAGE_KEYS.EXAMS, INITIAL_EXAMS));
   const [submissions, setSubmissions] = useState<StudentSubmission[]>(() => loadFromStorage(STORAGE_KEYS.SUBMISSIONS, []));
 
-  // State Login (Selalu kosong saat pertama kali dibuka)
+  // State Login dengan Tab Peran (Admin / Guru / Siswa)
+  const [selectedRoleTab, setSelectedRoleTab] = useState<Role>('admin');
   const [currentUser, setCurrentUser] = useState<UserAccount | null>(null);
   const [usernameInput, setUsernameInput] = useState('');
   const [passwordInput, setPasswordInput] = useState('');
@@ -240,7 +242,6 @@ export function App() {
     'dashboard' | 'folders_builder' | 'bank_soal' | 'exams' | 'classes' | 'users' | 'results' | 'school'
   >('dashboard');
 
-  // Persistensi ke localStorage
   useEffect(() => localStorage.setItem(STORAGE_KEYS.SCHOOL, JSON.stringify(school)), [school]);
   useEffect(() => localStorage.setItem(STORAGE_KEYS.CLASSES, JSON.stringify(classes)), [classes]);
   useEffect(() => localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(users)), [users]);
@@ -252,10 +253,13 @@ export function App() {
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
     const found = users.find(
-      (u) => u.username.trim().toLowerCase() === usernameInput.trim().toLowerCase() && u.password === passwordInput
+      (u) =>
+        u.role === selectedRoleTab &&
+        u.username.trim().toLowerCase() === usernameInput.trim().toLowerCase() &&
+        u.password === passwordInput
     );
     if (!found) {
-      setLoginError('Username atau password tidak sesuai.');
+      setLoginError(`Akun ${roleLabel(selectedRoleTab)} dengan username & password tersebut tidak ditemukan.`);
       return;
     }
     setCurrentUser(found);
@@ -265,70 +269,176 @@ export function App() {
     setActiveTab(found.role === 'student' ? 'exams' : 'folders_builder');
   };
 
+  const handleQuickDemoLogin = (role: Role) => {
+    const demoAccount = users.find((u) => u.role === role);
+    if (!demoAccount) return;
+    setSelectedRoleTab(role);
+    setCurrentUser(demoAccount);
+    setLoginError('');
+    setUsernameInput('');
+    setPasswordInput('');
+    setActiveTab(role === 'student' ? 'exams' : 'folders_builder');
+  };
+
   const handleLogout = () => {
     setCurrentUser(null);
     setUsernameInput('');
     setPasswordInput('');
+    setLoginError('');
   };
 
+  function roleLabel(role: Role): string {
+    if (role === 'admin') return 'Admin';
+    if (role === 'teacher') return 'Guru';
+    return 'Siswa';
+  }
+
   // ==========================================
-  // HALAMAN LOGIN
+  // HALAMAN LOGIN (DENGAN PILIHAN ADMIN, GURU & SISWA)
   // ==========================================
   if (!currentUser) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-emerald-950 via-emerald-900 to-slate-900 flex items-center justify-center p-4">
-        <div className="w-full max-w-md bg-white rounded-2xl shadow-2xl overflow-hidden">
+        <div className="w-full max-w-lg bg-white rounded-2xl shadow-2xl overflow-hidden">
           <div className="bg-emerald-800 p-6 text-white text-center">
             <div className="w-16 h-16 mx-auto rounded-2xl bg-white/15 flex items-center justify-center font-extrabold text-2xl mb-3">
               {school.logoText}
             </div>
             <h1 className="text-xl font-bold">CBT {school.name}</h1>
-            <p className="text-emerald-100 text-xs mt-1">Computer Based Test • TP {school.academicYear}</p>
+            <p className="text-emerald-100 text-xs mt-1">
+              Pilih portal login Admin, Guru, atau Siswa • TP {school.academicYear}
+            </p>
           </div>
 
-          <form onSubmit={handleLogin} className="p-6 space-y-4" autoComplete="off">
+          <div className="p-6 space-y-5">
+            {/* Tab Pemilih Peran */}
+            <div className="grid grid-cols-3 gap-2 bg-slate-100 p-1.5 rounded-xl">
+              <button
+                type="button"
+                onClick={() => {
+                  setSelectedRoleTab('admin');
+                  setLoginError('');
+                }}
+                className={`flex items-center justify-center gap-1.5 py-2.5 rounded-lg text-xs sm:text-sm font-bold transition ${
+                  selectedRoleTab === 'admin'
+                    ? 'bg-emerald-700 text-white shadow'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                <ShieldCheck className="w-4 h-4" /> Admin
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setSelectedRoleTab('teacher');
+                  setLoginError('');
+                }}
+                className={`flex items-center justify-center gap-1.5 py-2.5 rounded-lg text-xs sm:text-sm font-bold transition ${
+                  selectedRoleTab === 'teacher'
+                    ? 'bg-emerald-700 text-white shadow'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                <UserCheck className="w-4 h-4" /> Guru
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setSelectedRoleTab('student');
+                  setLoginError('');
+                }}
+                className={`flex items-center justify-center gap-1.5 py-2.5 rounded-lg text-xs sm:text-sm font-bold transition ${
+                  selectedRoleTab === 'student'
+                    ? 'bg-emerald-700 text-white shadow'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                <GraduationCap className="w-4 h-4" /> Siswa
+              </button>
+            </div>
+
             {loginError && (
-              <div className="p-3 rounded-lg bg-red-50 border border-red-200 text-red-700 text-sm flex items-center gap-2">
+              <div className="p-3 rounded-xl bg-red-50 border border-red-200 text-red-700 text-sm flex items-center gap-2">
                 <AlertCircle className="w-4 h-4 shrink-0" />
                 <span>{loginError}</span>
               </div>
             )}
 
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Username / NIS / NIP</label>
-              <input
-                type="text"
-                name="cbt_login_user"
-                autoComplete="off"
-                value={usernameInput}
-                onChange={(e) => setUsernameInput(e.target.value)}
-                placeholder="Masukkan username Anda"
-                className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-emerald-600"
-                required
-              />
-            </div>
+            <form onSubmit={handleLogin} className="space-y-4" autoComplete="off">
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">
+                  Username {roleLabel(selectedRoleTab)}
+                </label>
+                <input
+                  type="text"
+                  name="cbt_username_field"
+                  autoComplete="off"
+                  value={usernameInput}
+                  onChange={(e) => setUsernameInput(e.target.value)}
+                  placeholder={
+                    selectedRoleTab === 'admin'
+                      ? 'Contoh: admin'
+                      : selectedRoleTab === 'teacher'
+                      ? 'Contoh: guru'
+                      : 'Contoh: siswa1'
+                  }
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-emerald-600"
+                  required
+                />
+              </div>
 
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Password</label>
-              <input
-                type="password"
-                name="cbt_login_pass"
-                autoComplete="new-password"
-                value={passwordInput}
-                onChange={(e) => setPasswordInput(e.target.value)}
-                placeholder="Masukkan password Anda"
-                className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-emerald-600"
-                required
-              />
-            </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Password</label>
+                <input
+                  type="password"
+                  name="cbt_password_field"
+                  autoComplete="new-password"
+                  value={passwordInput}
+                  onChange={(e) => setPasswordInput(e.target.value)}
+                  placeholder="Masukkan password"
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-emerald-600"
+                  required
+                />
+              </div>
 
-            <button
-              type="submit"
-              className="w-full py-3 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white font-semibold transition shadow-lg shadow-emerald-900/20"
-            >
-              Masuk ke Sistem CBT
-            </button>
-          </form>
+              <button
+                type="submit"
+                className="w-full py-3 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white font-bold transition shadow-lg shadow-emerald-900/20"
+              >
+                Masuk sebagai {roleLabel(selectedRoleTab)}
+              </button>
+            </form>
+
+            {/* Tombol Masuk Cepat Akun Bawaan */}
+            <div className="pt-3 border-t border-slate-100">
+              <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 text-center mb-2.5">
+                Akses Cepat Akun Bawaan (Password: 123)
+              </p>
+              <div className="grid grid-cols-3 gap-2">
+                <button
+                  type="button"
+                  onClick={() => handleQuickDemoLogin('admin')}
+                  className="py-2 px-2 rounded-xl border border-slate-200 hover:border-emerald-600 hover:bg-emerald-50 text-xs font-semibold text-slate-700 transition"
+                >
+                  Login Admin
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleQuickDemoLogin('teacher')}
+                  className="py-2 px-2 rounded-xl border border-slate-200 hover:border-emerald-600 hover:bg-emerald-50 text-xs font-semibold text-slate-700 transition"
+                >
+                  Login Guru
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleQuickDemoLogin('student')}
+                  className="py-2 px-2 rounded-xl border border-slate-200 hover:border-emerald-600 hover:bg-emerald-50 text-xs font-semibold text-slate-700 transition"
+                >
+                  Login Siswa
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     );
@@ -350,7 +460,6 @@ export function App() {
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-800 flex flex-col md:flex-row">
-      {/* Sidebar */}
       <aside className="w-full md:w-64 bg-emerald-950 text-white flex flex-col shrink-0 print:hidden">
         <div className="p-5 border-b border-emerald-800/70">
           <div className="flex items-center gap-3">
@@ -359,7 +468,7 @@ export function App() {
             </div>
             <div>
               <h2 className="font-bold text-sm leading-tight">{school.name}</h2>
-              <p className="text-[11px] text-emerald-300 uppercase">{currentUser.role}</p>
+              <p className="text-[11px] text-emerald-300 uppercase">{roleLabel(currentUser.role)}</p>
             </div>
           </div>
           <p className="text-xs text-emerald-100/80 mt-3 truncate">{currentUser.name}</p>
@@ -395,7 +504,6 @@ export function App() {
         </div>
       </aside>
 
-      {/* Konten Utama */}
       <main className="flex-1 p-4 md:p-8 overflow-y-auto">
         {activeTab === 'dashboard' && (
           <DashboardView
@@ -586,7 +694,6 @@ const NewQuestionFolderBuilderView: React.FC<{
       return;
     }
 
-    // Selalu membuat ID Folder Soal baru yang unik
     const newFolderId = `fld-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
     const newFolder: QuestionFolder = {
       id: newFolderId,
@@ -619,7 +726,7 @@ const NewQuestionFolderBuilderView: React.FC<{
         <div>
           <h1 className="text-2xl font-bold text-slate-900">Buat Folder Soal Baru</h1>
           <p className="text-sm text-slate-600">
-            Setiap sesi pembuatan soal akan membuat <strong>Folder Soal baru</strong> tersendiri dan tidak digabung ke soal yang sudah ada.
+            Setiap pembuatan soal akan membuat <strong>Folder Soal baru</strong> tersendiri dan tidak digabung ke soal yang sudah ada.
           </p>
         </div>
         <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-emerald-100 text-emerald-800 text-xs font-semibold">
@@ -635,7 +742,6 @@ const NewQuestionFolderBuilderView: React.FC<{
       )}
 
       <form onSubmit={handleSaveNewFolder} className="space-y-6">
-        {/* Identitas Folder Soal Baru */}
         <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm space-y-4">
           <div className="flex items-center gap-2 text-emerald-800 font-bold border-b border-slate-100 pb-3">
             <Folder className="w-5 h-5" />
@@ -651,7 +757,7 @@ const NewQuestionFolderBuilderView: React.FC<{
                 type="text"
                 value={folderTitle}
                 onChange={(e) => setFolderTitle(e.target.value)}
-                placeholder="Contoh: PAS Ganjil Fiqih Kelas 6 - Set A"
+                placeholder="Contoh: UH 1 Fiqih Kelas 6 - Paket A"
                 className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 focus:ring-2 focus:ring-emerald-600 focus:outline-none"
                 required
               />
@@ -684,7 +790,7 @@ const NewQuestionFolderBuilderView: React.FC<{
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-2">Target Kelas (Bisa pilih lebih dari 1)</label>
+            <label className="block text-sm font-medium text-slate-700 mb-2">Target Kelas</label>
             <div className="flex flex-wrap gap-2">
               {classes.map((cls) => {
                 const active = selectedClasses.includes(cls.id);
@@ -707,7 +813,6 @@ const NewQuestionFolderBuilderView: React.FC<{
           </div>
         </div>
 
-        {/* Daftar Butir Soal di Dalam Folder Baru */}
         <div className="space-y-4">
           <div className="flex items-center justify-between">
             <h2 className="text-lg font-bold text-slate-900">
@@ -766,7 +871,6 @@ const NewQuestionFolderBuilderView: React.FC<{
                       type="button"
                       onClick={() => removeDraftQuestion(d.tempId)}
                       className="p-2 text-red-600 hover:bg-red-50 rounded-lg"
-                      title="Hapus butir soal"
                     >
                       <Trash2 className="w-4 h-4" />
                     </button>
@@ -774,7 +878,6 @@ const NewQuestionFolderBuilderView: React.FC<{
                 </div>
               </div>
 
-              {/* Simbol cepat kimia/pecahan */}
               <div className="flex flex-wrap items-center gap-1.5 text-xs">
                 <span className="text-slate-500 mr-1">Sisipkan simbol:</span>
                 {['H₂O', 'CO₂', '½', '¾', '×', '÷', '≈', '≠', '°C'].map((sym) => (
@@ -906,7 +1009,6 @@ const QuestionFolderManagerView: React.FC<{
   const [editTitle, setEditTitle] = useState('');
   const [editSubject, setEditSubject] = useState('');
 
-  // Form tambah soal cepat ke folder yang sedang dibuka
   const [newPrompt, setNewPrompt] = useState('');
   const [optA, setOptA] = useState('');
   const [optB, setOptB] = useState('');
@@ -987,7 +1089,6 @@ const QuestionFolderManagerView: React.FC<{
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        {/* Daftar Folder */}
         <div className="lg:col-span-5 space-y-3">
           {filteredFolders.map((f) => {
             const count = questions.filter((q) => q.folderId === f.id).length;
@@ -1053,7 +1154,6 @@ const QuestionFolderManagerView: React.FC<{
                           type="button"
                           onClick={() => startEditFolder(f)}
                           className="p-1.5 text-slate-500 hover:text-emerald-700 rounded-lg"
-                          title="Ubah nama folder"
                         >
                           <Edit3 className="w-3.5 h-3.5" />
                         </button>
@@ -1064,7 +1164,6 @@ const QuestionFolderManagerView: React.FC<{
                             if (selectedFolderId === f.id) setSelectedFolderId(null);
                           }}
                           className="p-1.5 text-slate-500 hover:text-red-600 rounded-lg"
-                          title="Hapus folder beserta isinya"
                         >
                           <Trash2 className="w-3.5 h-3.5" />
                         </button>
@@ -1084,15 +1183,8 @@ const QuestionFolderManagerView: React.FC<{
               </div>
             );
           })}
-
-          {filteredFolders.length === 0 && (
-            <div className="bg-white rounded-2xl border border-dashed border-slate-300 p-8 text-center text-sm text-slate-500">
-              Belum ada folder soal yang cocok.
-            </div>
-          )}
         </div>
 
-        {/* Isi Folder Terpilih */}
         <div className="lg:col-span-7">
           {activeFolder ? (
             <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm space-y-5">
@@ -1104,12 +1196,8 @@ const QuestionFolderManagerView: React.FC<{
                 <p className="text-xs text-slate-500 mt-1">
                   Mapel: {activeFolder.subject} • Dibuat oleh {activeFolder.createdBy} ({activeFolder.createdAt})
                 </p>
-                {activeFolder.description && (
-                  <p className="text-sm text-slate-600 mt-2">{activeFolder.description}</p>
-                )}
               </div>
 
-              {/* Form tambah soal langsung ke folder ini */}
               <form onSubmit={handleQuickAdd} className="p-4 rounded-xl bg-slate-50 border border-slate-200 space-y-3">
                 <p className="text-xs font-bold uppercase text-slate-700">
                   + Tambah Soal ke Folder "{activeFolder.title}"
@@ -1175,15 +1263,11 @@ const QuestionFolderManagerView: React.FC<{
                 </div>
               </form>
 
-              {/* List soal dalam folder */}
               <div className="space-y-3">
                 {folderQuestions.map((q, idx) => (
                   <div key={q.id} className="p-4 rounded-xl border border-slate-200 space-y-2">
                     <div className="flex items-start justify-between gap-2">
-                      <p
-                        dir={q.isArabic ? 'rtl' : 'ltr'}
-                        className="font-semibold text-sm text-slate-900"
-                      >
+                      <p dir={q.isArabic ? 'rtl' : 'ltr'} className="font-semibold text-sm text-slate-900">
                         {idx + 1}. {q.prompt}
                       </p>
                       <button
@@ -1215,12 +1299,6 @@ const QuestionFolderManagerView: React.FC<{
                     )}
                   </div>
                 ))}
-
-                {folderQuestions.length === 0 && (
-                  <p className="text-center text-sm text-slate-500 py-6">
-                    Folder ini belum memiliki butir soal.
-                  </p>
-                )}
               </div>
             </div>
           ) : (
@@ -1266,7 +1344,6 @@ const ExamsView: React.FC<{
   const [selectedClassIds, setSelectedClassIds] = useState<string[]>([]);
   const [duration, setDuration] = useState(60);
 
-  // Mode mengerjakan ujian (Siswa)
   const [activeExam, setActiveExam] = useState<ExamSchedule | null>(null);
   const [answers, setAnswers] = useState<Record<string, string>>({});
 
@@ -1300,7 +1377,6 @@ const ExamsView: React.FC<{
     setSelectedClassIds([]);
   };
 
-  // Mengambil soal dari folder-folder yang dipilih pada jadwal ujian
   const examQuestions = useMemo(() => {
     if (!activeExam) return [];
     return questions.filter((q) => activeExam.folderIds.includes(q.folderId));
@@ -1824,7 +1900,7 @@ const UsersManagerView: React.FC<{
             <div>
               <p className="font-bold">{u.name}</p>
               <p className="text-xs text-slate-500">
-                @{u.username} • Role: {u.role}
+                @{u.username} • Role: {roleLabel(u.role)}
               </p>
             </div>
             {u.username !== 'admin' && (
