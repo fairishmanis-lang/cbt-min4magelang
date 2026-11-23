@@ -37,7 +37,8 @@ import {
   Copy,
   Pencil,
   FolderOpen,
-  ArrowLeft
+  ArrowLeft,
+  Lock
 } from "lucide-react";
 
 // ============================================================================
@@ -391,6 +392,105 @@ const MENU_CONFIG = {
     { id: "available_exams", label: "Ujian Tersedia", icon: PlayCircle },
     { id: "student_history", label: "Riwayat & Nilai", icon: History }
   ]
+};
+
+// ============================================================================
+// UTILITAS JADWAL UJIAN (VALIDASI TANGGAL, JAM MULAI & JAM SELESAI)
+// ============================================================================
+const parseLocalDateAndTime = (dateStr, timeStr, fallbackTime = "00:00") => {
+  if (!dateStr) return null;
+  const dateMatch = String(dateStr).trim().match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!dateMatch) {
+    const fallbackParsed = new Date(`${dateStr}T${timeStr || fallbackTime}`);
+    return Number.isNaN(fallbackParsed.getTime()) ? null : fallbackParsed;
+  }
+  const year = Number(dateMatch[1]);
+  const month = Number(dateMatch[2]) - 1;
+  const day = Number(dateMatch[3]);
+
+  const timeRaw = String(timeStr || fallbackTime).trim();
+  const timeMatch = timeRaw.match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?$/);
+  const hours = timeMatch ? Number(timeMatch[1]) : 0;
+  const minutes = timeMatch ? Number(timeMatch[2]) : 0;
+  const seconds = timeMatch && timeMatch[3] ? Number(timeMatch[3]) : 0;
+
+  const dt = new Date(year, month, day, hours, minutes, seconds);
+  return Number.isNaN(dt.getTime()) ? null : dt;
+};
+
+const evaluateExamScheduleStatus = (exam, nowMs = Date.now()) => {
+  if (!exam) {
+    return {
+      canOpen: false,
+      code: "INVALID",
+      label: "Jadwal Tidak Valid",
+      message: "Data jadwal ujian tidak ditemukan."
+    };
+  }
+  if (String(exam.status || "AKTIF").toUpperCase() === "NONAKTIF") {
+    return {
+      canOpen: false,
+      code: "INACTIVE",
+      label: "Jadwal Nonaktif",
+      message: "Ujian ini sedang dinonaktifkan oleh panitia/pengawas."
+    };
+  }
+  if (!exam.exam_date) {
+    return {
+      canOpen: false,
+      code: "NO_DATE",
+      label: "Tanggal Belum Diatur",
+      message: "Tanggal pelaksanaan ujian belum ditentukan pada jadwal."
+    };
+  }
+
+  const startDt = parseLocalDateAndTime(exam.exam_date, exam.start_time, "00:00");
+  const endDt = parseLocalDateAndTime(exam.exam_date, exam.end_time, "23:59");
+
+  if (!startDt || !endDt) {
+    return {
+      canOpen: false,
+      code: "INVALID_FORMAT",
+      label: "Format Jadwal Tidak Valid",
+      message: "Format tanggal atau jam pada jadwal ujian tidak valid."
+    };
+  }
+
+  // Jika jam selesai lebih kecil atau sama dengan jam mulai, anggap tidak valid
+  if (endDt.getTime() <= startDt.getTime()) {
+    return {
+      canOpen: false,
+      code: "INVALID_RANGE",
+      label: "Rentang Jam Tidak Valid",
+      message: "Jam selesai ujian harus lebih akhir dari jam mulai."
+    };
+  }
+
+  if (nowMs < startDt.getTime()) {
+    return {
+      canOpen: false,
+      code: "UPCOMING",
+      label: "Belum Dimulai",
+      message: `Soal belum dapat dibuka. Ujian baru dibuka pada ${exam.exam_date} pukul ${exam.start_time || "00:00"}.`
+    };
+  }
+
+  if (nowMs > endDt.getTime()) {
+    return {
+      canOpen: false,
+      code: "EXPIRED",
+      label: "Jadwal Berakhir",
+      message: `Jadwal pengerjaan telah berakhir pada ${exam.exam_date} pukul ${exam.end_time || "23:59"}.`
+    };
+  }
+
+  return {
+    canOpen: true,
+    code: "OPEN",
+    label: "Sedang Berlangsung",
+    message: "Soal dapat dibuka dan dikerjakan sesuai jadwal.",
+    endAtMs: endDt.getTime()
+  };
 };
 
 // ============================================================================
@@ -994,7 +1094,6 @@ function CbtMin4MagelangApp() {
       return null;
     }
   }, [supabaseUrl, supabaseKey]);
-
   const [currentUser, setCurrentUser] = useState(null);
   const [isSimulationMode, setIsSimulationMode] = useState(false);
   const [hasProductionAdmin, setHasProductionAdmin] = useState(true);
@@ -1982,6 +2081,7 @@ function DashboardView({ user, isSimulation, schoolSettings, stats, onNavigate }
     { label: "Jadwal Ujian", value: stats.exams, menu: "exams", roles: ["ADMIN", "GURU"] },
     { label: "Hasil Ujian", value: stats.results, menu: "results", roles: ["ADMIN", "GURU"] }
   ].filter((c) => c.roles.includes(user.role));
+
   return (
     <div className="space-y-5">
       <div className="bg-white border border-slate-200 rounded-2xl p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -2042,9 +2142,8 @@ function DashboardView({ user, isSimulation, schoolSettings, stats, onNavigate }
         </div>
         <p>
           Seluruh statistik di atas dihitung secara nyata dari tabel PostgreSQL Supabase tanpa data
-          fiktif. Gunakan fitur <strong>Unduh Template (.xlsx)</strong> dan{" "}
-          <strong>Upload / Import</strong> pada menu master data serta bank soal untuk mempercepat
-          input data madrasah.
+          fiktif. Soal ujian hanya dapat dibuka dan dikerjakan sesuai tanggal serta rentang jam
+          jadwal yang telah ditetapkan.
         </p>
       </div>
     </div>
@@ -2059,6 +2158,7 @@ function SchoolIdentityView({ supabase, schoolSettings, onSaved, showBanner }) {
   useEffect(() => {
     setForm(schoolSettings);
   }, [schoolSettings]);
+
   const handleLogoUpload = (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -2071,6 +2171,7 @@ function SchoolIdentityView({ supabase, schoolSettings, onSaved, showBanner }) {
     };
     reader.readAsDataURL(file);
   };
+
   const handleSave = async (e) => {
     e.preventDefault();
     if (!supabase) return showBanner("error", "Supabase belum terhubung.");
@@ -2087,6 +2188,7 @@ function SchoolIdentityView({ supabase, schoolSettings, onSaved, showBanner }) {
       showBanner("error", `Gagal menyimpan identitas: ${err.message}`);
     }
   };
+
   return (
     <form
       onSubmit={handleSave}
@@ -2218,6 +2320,7 @@ function ClassesManagerView({ supabase, classesList, students, isSimulation, onR
   const [grade, setGrade] = useState("1");
   const [search, setSearch] = useState("");
   const [importSummary, setImportSummary] = useState(null);
+
   const filtered = useMemo(
     () =>
       classesList.filter(
@@ -2227,6 +2330,7 @@ function ClassesManagerView({ supabase, classesList, students, isSimulation, onR
       ),
     [classesList, search]
   );
+
   const handleDownloadTemplate = async () => {
     await downloadXlsxTemplateFile("Template_Data_Kelas_MIN4.xlsx", "Data_Kelas", [
       { name: "1A", grade_level: "1" },
@@ -2234,6 +2338,7 @@ function ClassesManagerView({ supabase, classesList, students, isSimulation, onR
     ]);
     showBanner("success", "Template Data Kelas (.xlsx) berhasil diunduh.");
   };
+
   const handleImportFile = async (e) => {
     const file = e.target.files?.[0];
     e.target.value = "";
@@ -2283,6 +2388,7 @@ function ClassesManagerView({ supabase, classesList, students, isSimulation, onR
       showBanner("error", `Gagal mengimpor Data Kelas: ${err.message}`);
     }
   };
+
   const handleAdd = async (e) => {
     e.preventDefault();
     if (!supabase || !name.trim()) return;
@@ -2296,6 +2402,7 @@ function ClassesManagerView({ supabase, classesList, students, isSimulation, onR
     await onRefresh();
     showBanner("success", "Kelas berhasil ditambahkan.");
   };
+
   const handleDelete = async (cls) => {
     const hasStudents = students.some((s) => s.class_id === cls.id);
     if (hasStudents) {
@@ -2306,6 +2413,7 @@ function ClassesManagerView({ supabase, classesList, students, isSimulation, onR
     await onRefresh();
     showBanner("success", "Kelas dihapus.");
   };
+
   return (
     <div className="space-y-4">
       <form
@@ -2443,6 +2551,7 @@ function SubjectsManagerView({ supabase, subjects, isSimulation, onRefresh, show
   const [name, setName] = useState("");
   const [search, setSearch] = useState("");
   const [importSummary, setImportSummary] = useState(null);
+
   const filtered = useMemo(
     () =>
       subjects.filter(
@@ -2452,6 +2561,7 @@ function SubjectsManagerView({ supabase, subjects, isSimulation, onRefresh, show
       ),
     [subjects, search]
   );
+
   const handleDownloadTemplate = async () => {
     await downloadXlsxTemplateFile("Template_Mata_Pelajaran_MIN4.xlsx", "Mata_Pelajaran", [
       { code: "MTK", name: "Matematika" },
@@ -2459,6 +2569,7 @@ function SubjectsManagerView({ supabase, subjects, isSimulation, onRefresh, show
     ]);
     showBanner("success", "Template Mata Pelajaran (.xlsx) berhasil diunduh.");
   };
+
   const handleImportFile = async (e) => {
     const file = e.target.files?.[0];
     e.target.value = "";
@@ -2508,6 +2619,7 @@ function SubjectsManagerView({ supabase, subjects, isSimulation, onRefresh, show
       showBanner("error", `Gagal mengimpor Mata Pelajaran: ${err.message}`);
     }
   };
+
   const handleAdd = async (e) => {
     e.preventDefault();
     if (!supabase || !code.trim() || !name.trim()) return;
@@ -2526,12 +2638,14 @@ function SubjectsManagerView({ supabase, subjects, isSimulation, onRefresh, show
     await onRefresh();
     showBanner("success", "Mata pelajaran berhasil ditambahkan.");
   };
+
   const handleDelete = async (id) => {
     const { error } = await supabase.from("subjects").delete().eq("id", id);
     if (error) return showBanner("error", error.message);
     await onRefresh();
     showBanner("success", "Mata pelajaran dihapus.");
   };
+
   return (
     <div className="space-y-4">
       <form
@@ -2662,6 +2776,7 @@ function TeachersManagerView({ supabase, teachers, subjects, isSimulation, onRef
   const [subjectId, setSubjectId] = useState("");
   const [search, setSearch] = useState("");
   const [importSummary, setImportSummary] = useState(null);
+
   const filtered = useMemo(
     () =>
       teachers.filter(
@@ -2672,6 +2787,7 @@ function TeachersManagerView({ supabase, teachers, subjects, isSimulation, onRef
       ),
     [teachers, search]
   );
+
   const handleDownloadTemplate = async () => {
     const sampleSubject = subjects[0]?.name || "Matematika";
     await downloadXlsxTemplateFile("Template_Data_Guru_MIN4.xlsx", "Data_Guru", [
@@ -2685,6 +2801,7 @@ function TeachersManagerView({ supabase, teachers, subjects, isSimulation, onRef
     ]);
     showBanner("success", "Template Data Guru (.xlsx) berhasil diunduh.");
   };
+
   const handleImportFile = async (e) => {
     const file = e.target.files?.[0];
     e.target.value = "";
@@ -2759,6 +2876,7 @@ function TeachersManagerView({ supabase, teachers, subjects, isSimulation, onRef
       showBanner("error", `Gagal mengimpor Data Guru: ${err.message}`);
     }
   };
+
   const handleAdd = async (e) => {
     e.preventDefault();
     if (!supabase || !fullName.trim() || !username.trim()) return;
@@ -2779,12 +2897,14 @@ function TeachersManagerView({ supabase, teachers, subjects, isSimulation, onRef
     await onRefresh();
     showBanner("success", "Data guru berhasil disimpan.");
   };
+
   const handleDelete = async (id) => {
     const { error } = await supabase.from("teachers").delete().eq("id", id);
     if (error) return showBanner("error", error.message);
     await onRefresh();
     showBanner("success", "Data guru dihapus.");
   };
+
   return (
     <div className="space-y-4">
       <form
@@ -2948,6 +3068,7 @@ function StudentsManagerView({ supabase, students, classesList, isSimulation, on
   const [filterClass, setFilterClass] = useState("");
   const [importSummary, setImportSummary] = useState(null);
   const [lastCreatedCreds, setLastCreatedCreds] = useState(null);
+
   const filtered = useMemo(
     () =>
       students.filter((st) => {
@@ -2962,6 +3083,7 @@ function StudentsManagerView({ supabase, students, classesList, isSimulation, on
       }),
     [students, search, filterClass]
   );
+
   const handleDownloadTemplate = async () => {
     const sampleClass = classesList[0]?.name || "6A";
     await downloadXlsxTemplateFile("Template_Data_Siswa_MIN4.xlsx", "Data_Siswa", [
@@ -2977,6 +3099,7 @@ function StudentsManagerView({ supabase, students, classesList, isSimulation, on
     ]);
     showBanner("success", "Template Data Siswa (.xlsx) berhasil diunduh.");
   };
+
   const handleImportFile = async (e) => {
     const file = e.target.files?.[0];
     e.target.value = "";
@@ -3051,6 +3174,7 @@ function StudentsManagerView({ supabase, students, classesList, isSimulation, on
       showBanner("error", `Gagal mengimpor Data Siswa: ${err.message}`);
     }
   };
+
   const handleAdd = async (e) => {
     e.preventDefault();
     if (!supabase || !fullName.trim() || !classId) {
@@ -3092,12 +3216,14 @@ function StudentsManagerView({ supabase, students, classesList, isSimulation, on
       `Data & kredensial login siswa "${payload.full_name}" berhasil disimpan.`
     );
   };
+
   const handleDelete = async (id) => {
     const { error } = await supabase.from("students").delete().eq("id", id);
     if (error) return showBanner("error", error.message);
     await onRefresh();
     showBanner("success", "Data siswa dihapus.");
   };
+
   return (
     <div className="space-y-4">
       <form
@@ -3360,7 +3486,6 @@ function QuestionBankManagerView({
   const [optE, setOptE] = useState("");
   const [correctAnswer, setCorrectAnswer] = useState("A");
   const [weight, setWeight] = useState(1);
-
   const [editingQuestion, setEditingQuestion] = useState(null);
   const [editSubjectId, setEditSubjectId] = useState("");
   const [editBatchDate, setEditBatchDate] = useState(() => getLocalTodayIso());
@@ -3375,7 +3500,6 @@ function QuestionBankManagerView({
   const [editCorrectAnswer, setEditCorrectAnswer] = useState("");
   const [editWeight, setEditWeight] = useState(1);
   const [savingEdit, setSavingEdit] = useState(false);
-
   const [selectedFolderKey, setSelectedFolderKey] = useState(null);
   const [search, setSearch] = useState("");
   const [filterSubject, setFilterSubject] = useState("");
@@ -3405,7 +3529,6 @@ function QuestionBankManagerView({
       }
       groupMap.get(folderKey).items.push(q);
     });
-
     const queryLower = search.trim().toLowerCase();
     return Array.from(groupMap.values())
       .filter((folder) => {
@@ -3622,7 +3745,6 @@ function QuestionBankManagerView({
           is_simulation: Boolean(isSimulation)
         });
       });
-
       let insertedCount = 0;
       if (validPayloads.length > 0) {
         let res = await supabase.from("questions").insert(validPayloads);
@@ -3671,7 +3793,6 @@ function QuestionBankManagerView({
       res = await supabase.from("questions").insert([baseRow]);
     }
     if (res.error) return showBanner("error", res.error.message);
-
     const targetFolderKey = `${subjectId || "__NO_SUBJECT__"}__${chosenDate}`;
     setSelectedFolderKey(targetFolderKey);
     setQuestionText("");
@@ -3786,7 +3907,6 @@ function QuestionBankManagerView({
             </button>
           </div>
         </div>
-
         {importSummary && (
           <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3 text-xs space-y-1">
             <div className="font-extrabold text-emerald-900">
@@ -3802,7 +3922,6 @@ function QuestionBankManagerView({
             )}
           </div>
         )}
-
         <form onSubmit={handleSaveQuestion} className="space-y-3">
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
             <div>
@@ -3867,7 +3986,6 @@ function QuestionBankManagerView({
               />
             </div>
           </div>
-
           <div>
             <label className="block text-xs font-bold text-slate-700 mb-1">Pertanyaan Soal</label>
             <textarea
@@ -3878,7 +3996,6 @@ function QuestionBankManagerView({
               className="w-full border border-slate-300 rounded-xl px-3 py-2 text-xs"
             />
           </div>
-
           {(qType === "PG" || qType === "PG_KOMPLEKS") && (
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
               <input
@@ -3918,7 +4035,6 @@ function QuestionBankManagerView({
               />
             </div>
           )}
-
           <div className="flex flex-wrap items-end gap-3">
             <div className="flex-1 min-w-[200px]">
               <label className="block text-xs font-bold text-slate-700 mb-1">
@@ -3941,8 +4057,6 @@ function QuestionBankManagerView({
           </div>
         </form>
       </div>
-
-      {/* Filter Folder / Soal */}
       <div className="flex flex-wrap gap-3">
         <div className="flex items-center gap-2 bg-white border border-slate-200 rounded-xl px-3 py-2 flex-1 min-w-[200px]">
           <Search className="w-4 h-4 text-slate-400" />
@@ -3993,8 +4107,6 @@ function QuestionBankManagerView({
           </button>
         )}
       </div>
-
-      {/* Tampilan Folder vs Isi Folder */}
       {!activeFolder ? (
         <div className="space-y-2.5">
           <div className="flex items-center justify-between text-xs text-slate-600 px-1">
@@ -4084,7 +4196,6 @@ function QuestionBankManagerView({
               </button>
             </div>
           </div>
-
           {visibleQuestionsInFolder.length === 0 ? (
             <div className="bg-white border border-slate-200 rounded-2xl p-6 text-center text-xs text-slate-500">
               Tidak ada soal di dalam folder ini yang cocok dengan pencarian.
@@ -4147,7 +4258,6 @@ function QuestionBankManagerView({
           )}
         </div>
       )}
-
       {editingQuestion && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50 overflow-y-auto">
           <div className="bg-white rounded-2xl max-w-2xl w-full p-5 space-y-4 shadow-lg my-auto">
@@ -4393,6 +4503,7 @@ function ExamsManagerView({
     "Berdoalah sebelum mengerjakan ujian. Pilihlah jawaban yang paling tepat."
   );
   const [selectedQuestionIds, setSelectedQuestionIds] = useState([]);
+
   const availableQuestions = useMemo(
     () => questions.filter((q) => !subjectId || q.subject_id === subjectId),
     [questions, subjectId]
@@ -4403,6 +4514,7 @@ function ExamsManagerView({
       allQuestionIds.length > 0 && allQuestionIds.every((id) => selectedQuestionIds.includes(id)),
     [allQuestionIds, selectedQuestionIds]
   );
+
   const handleToggleSelectAllQuestions = () => {
     if (isAllSelected) {
       setSelectedQuestionIds((prev) => prev.filter((id) => !allQuestionIds.includes(id)));
@@ -4410,16 +4522,19 @@ function ExamsManagerView({
       setSelectedQuestionIds((prev) => Array.from(new Set([...prev, ...allQuestionIds])));
     }
   };
+
   const toggleQuestionSelect = (id) => {
     setSelectedQuestionIds((prev) =>
       prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]
     );
   };
+
   const toggleClassSelect = (id) => {
     setSelectedClassIds((prev) =>
       prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]
     );
   };
+
   const handleToggleAllClasses = () => {
     if (selectedClassIds.length === classesList.length) {
       setSelectedClassIds([]);
@@ -4427,11 +4542,17 @@ function ExamsManagerView({
       setSelectedClassIds(classesList.map((c) => c.id));
     }
   };
+
   const handleCreateExam = async (e) => {
     e.preventDefault();
     if (!supabase) return;
     if (!title.trim() || !examDate || selectedQuestionIds.length === 0) {
       return showBanner("error", "Judul ujian, tanggal pelaksanaan, dan minimal 1 soal wajib dipilih.");
+    }
+    const startDt = parseLocalDateAndTime(examDate, startTime, "00:00");
+    const endDt = parseLocalDateAndTime(examDate, endTime, "23:59");
+    if (!startDt || !endDt || endDt.getTime() <= startDt.getTime()) {
+      return showBanner("error", "Jam selesai ujian harus lebih akhir dari jam mulai ujian.");
     }
     const classIdValue =
       selectedClassIds.length === 0 || selectedClassIds.length === classesList.length
@@ -4461,6 +4582,16 @@ function ExamsManagerView({
     await onRefresh();
     showBanner("success", "Paket jadwal ujian berhasil dibuat.");
   };
+
+  const handleToggleExamStatus = async (exam) => {
+    if (!supabase) return;
+    const nextStatus = exam.status === "NONAKTIF" ? "AKTIF" : "NONAKTIF";
+    const { error } = await supabase.from("exams").update({ status: nextStatus }).eq("id", exam.id);
+    if (error) return showBanner("error", error.message);
+    await onRefresh();
+    showBanner("success", `Status jadwal "${exam.title}" diubah menjadi ${nextStatus}.`);
+  };
+
   const handlePrintNaskahSoal = (exam) => {
     const qIds = Array.isArray(exam.question_ids) ? exam.question_ids : [];
     const examQuestions = qIds.map((id) => questions.find((q) => q.id === id)).filter(Boolean);
@@ -4523,6 +4654,7 @@ function ExamsManagerView({
     });
     openPrintDocumentWindow(html);
   };
+
   return (
     <div className="space-y-4">
       <form
@@ -4621,12 +4753,14 @@ function ExamsManagerView({
             <div className="flex gap-2">
               <input
                 type="time"
+                required
                 value={startTime}
                 onChange={(e) => setStartTime(e.target.value)}
                 className="w-full border border-slate-300 rounded-xl px-2 py-2"
               />
               <input
                 type="time"
+                required
                 value={endTime}
                 onChange={(e) => setEndTime(e.target.value)}
                 className="w-full border border-slate-300 rounded-xl px-2 py-2"
@@ -4715,21 +4849,23 @@ function ExamsManagerView({
             <tr>
               <th className="p-3 text-left">Nama Ujian</th>
               <th className="p-3 text-left">Tanggal & Waktu</th>
+              <th className="p-3 text-center">Status Jadwal</th>
               <th className="p-3 text-center">Jumlah Soal</th>
               <th className="p-3 text-center">Peserta</th>
-              <th className="p-3 text-right">Cetak Naskah</th>
+              <th className="p-3 text-right">Aksi</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
             {exams.length === 0 ? (
               <tr>
-                <td colSpan={5} className="p-6 text-center text-slate-500">
+                <td colSpan={6} className="p-6 text-center text-slate-500">
                   Belum ada jadwal ujian pada akun ini.
                 </td>
               </tr>
             ) : (
               exams.map((ex) => {
                 const pCount = participants.filter((p) => p.exam_id === ex.id).length;
+                const sched = evaluateExamScheduleStatus(ex);
                 return (
                   <tr key={ex.id}>
                     <td className="p-3 font-bold text-slate-900">{ex.title}</td>
@@ -4737,18 +4873,40 @@ function ExamsManagerView({
                       {ex.exam_date} ({ex.start_time} - {ex.end_time})
                     </td>
                     <td className="p-3 text-center">
+                      <span
+                        className={`px-2.5 py-0.5 rounded-full text-[11px] font-bold ${
+                          sched.code === "OPEN"
+                            ? "bg-emerald-50 text-emerald-800"
+                            : sched.code === "UPCOMING"
+                              ? "bg-amber-50 text-amber-800"
+                              : "bg-slate-100 text-slate-600"
+                        }`}
+                      >
+                        {sched.label}
+                      </span>
+                    </td>
+                    <td className="p-3 text-center">
                       {Array.isArray(ex.question_ids) ? ex.question_ids.length : 0} soal
                     </td>
                     <td className="p-3 text-center">{pCount} siswa</td>
                     <td className="p-3 text-right">
-                      <button
-                        type="button"
-                        onClick={() => handlePrintNaskahSoal(ex)}
-                        className="px-3 py-1.5 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 font-bold inline-flex items-center gap-1"
-                      >
-                        <Printer className="w-3.5 h-3.5" />
-                        Cetak Naskah PDF
-                      </button>
+                      <div className="inline-flex items-center gap-1.5">
+                        <button
+                          type="button"
+                          onClick={() => handleToggleExamStatus(ex)}
+                          className="px-2.5 py-1.5 rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-700 font-bold"
+                        >
+                          {ex.status === "NONAKTIF" ? "Aktifkan" : "Nonaktifkan"}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handlePrintNaskahSoal(ex)}
+                          className="px-3 py-1.5 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 font-bold inline-flex items-center gap-1"
+                        >
+                          <Printer className="w-3.5 h-3.5" />
+                          Cetak Naskah PDF
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 );
@@ -4782,16 +4940,19 @@ function ParticipantsManagerView({
   const [selectedExamId, setSelectedExamId] = useState("");
   const [selectedClassIds, setSelectedClassIds] = useState([]);
   const [filterClassIds, setFilterClassIds] = useState([]);
+
   const toggleAssignClass = (id) => {
     setSelectedClassIds((prev) =>
       prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]
     );
   };
+
   const toggleFilterClass = (id) => {
     setFilterClassIds((prev) =>
       prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]
     );
   };
+
   const combinedParticipants = useMemo(() => {
     if (!selectedExamId) return [];
     const byStudentKey = new Map();
@@ -5165,7 +5326,7 @@ function ParticipantsManagerView({
 }
 
 // ============================================================================
-// MODUL 7: PORTAL UJIAN SISWA (TIMER, SIMPAN OTOMATIS & PENYERAHAN)
+// MODUL 7: PORTAL UJIAN SISWA (STRICT SCHEDULE GATE + TIMER + PENYERAHAN)
 // ============================================================================
 function StudentExamPortalView({
   mode,
@@ -5189,9 +5350,17 @@ function StudentExamPortalView({
   const [flaggedMap, setFlaggedMap] = useState<Record<string, boolean>>({});
   const [secondsLeft, setSecondsLeft] = useState(0);
   const [confirmFinishOpen, setConfirmFinishOpen] = useState(false);
+  const [nowTick, setNowTick] = useState(() => Date.now());
+
+  // Perbarui waktu berjalan setiap detik agar status jadwal & timer akurat
+  useEffect(() => {
+    const clockTimer = setInterval(() => {
+      setNowTick(Date.now());
+    }, 1000);
+    return () => clearInterval(clockTimer);
+  }, []);
 
   const myExams = useMemo(() => {
-    if (isSimulation) return exams.filter((e) => e.status === "AKTIF");
     const myPartExamIds = new Set(
       participants
         .filter(
@@ -5216,15 +5385,17 @@ function StudentExamPortalView({
         (currentUser.class_id && targetClassList.includes(String(currentUser.class_id)));
       return (isAssignedAsParticipant || matchesTargetClass) && e.status !== "NONAKTIF";
     });
-  }, [exams, participants, currentUser, isSimulation]);
+  }, [exams, participants, currentUser]);
 
   const activeQuestions = useMemo(() => {
     if (!activeExam) return [];
+    const sched = evaluateExamScheduleStatus(activeExam, nowTick);
+    if (!sched.canOpen) return [];
     const qIds = Array.isArray(activeExam.question_ids) ? activeExam.question_ids : [];
     return qIds.map((id) => questions.find((q) => q.id === id)).filter(Boolean);
-  }, [activeExam, questions]);
+  }, [activeExam, questions, nowTick]);
 
-  const handleSubmitExam = async (isAuto = false) => {
+  const handleSubmitExam = async (isAuto = false, reasonMessage = "") => {
     if (!activeExam) return;
     setConfirmFinishOpen(false);
     if (supabase) {
@@ -5279,16 +5450,24 @@ function StudentExamPortalView({
     localStorage.removeItem(`cbt_min4_ans_${activeExam.id}_${currentUser.id}`);
     setActiveExam(null);
     showBanner(
-      "success",
-      isAuto
-        ? "Waktu ujian habis. Jawaban Anda telah diserahkan otomatis."
-        : "Ujian berhasil diselesaikan dan jawaban tersimpan."
+      isAuto ? "warning" : "success",
+      reasonMessage ||
+        (isAuto
+          ? "Waktu ujian habis. Jawaban Anda telah diserahkan otomatis."
+          : "Ujian berhasil diselesaikan dan jawaban tersimpan.")
     );
   };
 
   useEffect(() => {
     if (!activeExam) return;
     const interval = setInterval(() => {
+      const currentNow = Date.now();
+      const sched = evaluateExamScheduleStatus(activeExam, currentNow);
+      if (!sched.canOpen) {
+        clearInterval(interval);
+        handleSubmitExam(true, `${sched.message} Soal ditutup dan jawaban dikumpulkan otomatis.`);
+        return;
+      }
       setSecondsLeft((prev) => {
         if (prev <= 1) {
           clearInterval(interval);
@@ -5299,9 +5478,28 @@ function StudentExamPortalView({
       });
     }, 1000);
     return () => clearInterval(interval);
-  }, [activeExam]);
+  }, [activeExam, answersMap]);
 
   const handleStartExam = (exam) => {
+    const alreadyDone = attempts.some(
+      (a) => a.exam_id === exam.id && a.student_id === currentUser.id
+    );
+    if (alreadyDone) {
+      return showBanner("warning", "Anda sudah mengerjakan dan mengumpulkan ujian ini.");
+    }
+
+    const now = Date.now();
+    const sched = evaluateExamScheduleStatus(exam, now);
+    if (!sched.canOpen) {
+      return showBanner("error", sched.message);
+    }
+
+    const durationSeconds = (Number(exam.duration_minutes) || 60) * 60;
+    const remainingScheduleSeconds = sched.endAtMs
+      ? Math.max(1, Math.floor((sched.endAtMs - now) / 1000))
+      : durationSeconds;
+    const effectiveSeconds = Math.min(durationSeconds, remainingScheduleSeconds);
+
     const storageKey = `cbt_min4_ans_${exam.id}_${currentUser.id}`;
     const savedLocal = localStorage.getItem(storageKey);
     if (savedLocal) {
@@ -5314,29 +5512,33 @@ function StudentExamPortalView({
       setAnswersMap({});
     }
     setCurrentIndex(0);
-    setSecondsLeft((Number(exam.duration_minutes) || 60) * 60);
+    setSecondsLeft(effectiveSeconds);
     setActiveExam(exam);
   };
 
   const handleSelectAnswer = async (questionId, value) => {
+    if (!activeExam) return;
+    const sched = evaluateExamScheduleStatus(activeExam, Date.now());
+    if (!sched.canOpen) {
+      handleSubmitExam(true, `${sched.message} Jawaban tidak dapat diubah lagi.`);
+      return;
+    }
     const updated = { ...answersMap, [questionId]: value };
     setAnswersMap(updated);
-    if (activeExam) {
-      localStorage.setItem(
-        `cbt_min4_ans_${activeExam.id}_${currentUser.id}`,
-        JSON.stringify(updated)
-      );
-      if (supabase) {
-        await supabase.from("student_answers").upsert({
-          id: `${activeExam.id}_${currentUser.id}_${questionId}`,
-          exam_id: activeExam.id,
-          student_id: currentUser.id,
-          question_id: questionId,
-          answer: value,
-          is_simulation: Boolean(isSimulation),
-          updated_at: new Date().toISOString()
-        });
-      }
+    localStorage.setItem(
+      `cbt_min4_ans_${activeExam.id}_${currentUser.id}`,
+      JSON.stringify(updated)
+    );
+    if (supabase) {
+      await supabase.from("student_answers").upsert({
+        id: `${activeExam.id}_${currentUser.id}_${questionId}`,
+        exam_id: activeExam.id,
+        student_id: currentUser.id,
+        question_id: questionId,
+        answer: value,
+        is_simulation: Boolean(isSimulation),
+        updated_at: new Date().toISOString()
+      });
     }
   };
 
@@ -5350,7 +5552,8 @@ function StudentExamPortalView({
           <div>
             <h2 className="text-sm font-extrabold text-slate-900">{activeExam.title}</h2>
             <p className="text-xs text-slate-500">
-              Soal {currentIndex + 1} dari {activeQuestions.length}
+              Soal {currentIndex + 1} dari {activeQuestions.length} • Jadwal:{" "}
+              {activeExam.exam_date} ({activeExam.start_time} - {activeExam.end_time})
             </p>
           </div>
           <div className="px-4 py-2 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-900 font-mono text-sm font-extrabold flex items-center gap-2">
@@ -5593,6 +5796,7 @@ function StudentExamPortalView({
           const alreadyDone = attempts.some(
             (a) => a.exam_id === ex.id && a.student_id === currentUser.id
           );
+          const sched = evaluateExamScheduleStatus(ex, nowTick);
           const sub = subjects.find((s) => s.id === ex.subject_id);
           const targetClassList = String(ex.class_id || "")
             .split(",")
@@ -5605,31 +5809,65 @@ function StudentExamPortalView({
                   .map((id) => classesList.find((c) => c.id === id)?.name)
                   .filter(Boolean)
                   .join(", ") || "-";
+
           return (
             <div
               key={ex.id}
               className="bg-white border border-slate-200 rounded-2xl p-5 flex flex-col justify-between gap-3"
             >
-              <div className="space-y-1">
-                <span className="px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-800 text-[11px] font-bold">
-                  {sub?.name || "Ujian"} • {classLabel}
-                </span>
+              <div className="space-y-1.5">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <span className="px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-800 text-[11px] font-bold">
+                    {sub?.name || "Ujian"} • {classLabel}
+                  </span>
+                  <span
+                    className={`px-2.5 py-0.5 rounded-full text-[11px] font-extrabold ${
+                      alreadyDone
+                        ? "bg-slate-100 text-slate-700"
+                        : sched.canOpen
+                          ? "bg-emerald-100 text-emerald-900"
+                          : "bg-amber-100 text-amber-900"
+                    }`}
+                  >
+                    {alreadyDone ? "Selesai" : sched.label}
+                  </span>
+                </div>
                 <h3 className="text-sm font-extrabold text-slate-900">{ex.title}</h3>
-                <p className="text-xs text-slate-500">
-                  Tanggal: {ex.exam_date} • Durasi: {ex.duration_minutes} menit
+                <p className="text-xs text-slate-600">
+                  Tanggal: <strong>{ex.exam_date || "-"}</strong> • Jam:{" "}
+                  <strong>
+                    {ex.start_time || "-"} - {ex.end_time || "-"}
+                  </strong>{" "}
+                  • Durasi: {ex.duration_minutes} menit
                 </p>
+                {!alreadyDone && !sched.canOpen && (
+                  <p className="text-[11px] font-semibold text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-2.5 py-1.5">
+                    {sched.message}
+                  </p>
+                )}
               </div>
+
               {alreadyDone ? (
                 <span className="px-3 py-2 rounded-xl bg-slate-100 text-slate-600 text-xs font-bold text-center">
                   Sudah Dikerjakan
                 </span>
-              ) : (
+              ) : sched.canOpen ? (
                 <button
                   type="button"
                   onClick={() => handleStartExam(ex)}
-                  className="w-full py-2.5 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-extrabold"
+                  className="w-full py-2.5 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-extrabold transition"
                 >
-                  Mulai Kerjakan Ujian
+                  Buka & Kerjakan Soal
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  disabled
+                  onClick={() => handleStartExam(ex)}
+                  className="w-full py-2.5 rounded-xl bg-slate-200 text-slate-500 text-xs font-extrabold cursor-not-allowed flex items-center justify-center gap-1.5"
+                >
+                  <Lock className="w-3.5 h-3.5" />
+                  Soal Terkunci ({sched.label})
                 </button>
               )}
             </div>
@@ -5659,11 +5897,13 @@ function ResultsAndGradingView({
   useEffect(() => {
     setFormulaForm(gradingFormula);
   }, [gradingFormula]);
+
   const filteredResults = useMemo(
     () =>
       selectedExamId ? examResults.filter((r) => r.exam_id === selectedExamId) : examResults,
     [examResults, selectedExamId]
   );
+
   const handleRecalculateExam = async () => {
     if (!supabase || !selectedExamId) {
       return showBanner("error", "Pilih paket ujian yang akan dihitung ulang.");
@@ -5714,110 +5954,102 @@ function ResultsAndGradingView({
     await onRefresh();
     showBanner("success", "Perhitungan ulang nilai selesai berdasarkan kunci & rumus terbaru.");
   };
+
   return (
     <div className="space-y-4">
       <div className="bg-white border border-slate-200 rounded-2xl p-4 grid grid-cols-1 sm:grid-cols-4 gap-3 items-end">
         <div>
-          <label className="block text-xs font-bold text-slate-700 mb-1">Aturan PG Kompleks</label>
+          <label className="block text-xs font-bold text-slate-700 mb-1">Filter Ujian</label>
+          <select
+            value={selectedExamId}
+            onChange={(e) => setSelectedExamId(e.target.value)}
+            className="w-full border border-slate-300 rounded-xl px-3 py-2 text-xs"
+          >
+            <option value="">Semua Ujian</option>
+            {exams.map((ex) => (
+              <option key={ex.id} value={ex.id}>
+                {ex.title}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <label className="block text-xs font-bold text-slate-700 mb-1">Skor PG Kompleks</label>
           <select
             value={formulaForm.pg_kompleks_mode}
             onChange={(e) => setFormulaForm({ ...formulaForm, pg_kompleks_mode: e.target.value })}
             className="w-full border border-slate-300 rounded-xl px-3 py-2 text-xs"
           >
-            <option value="PROPORTIONAL">Proporsional Sebagian</option>
-            <option value="STRICT">Wajib Benar Semua</option>
+            <option value="PROPORTIONAL">Proporsional Parsial</option>
+            <option value="STRICT">Ketat (Benar Semua)</option>
           </select>
         </div>
         <div>
-          <label className="block text-xs font-bold text-slate-700 mb-1">Aturan Isian</label>
-          <select
-            value={formulaForm.isian_mode}
-            onChange={(e) => setFormulaForm({ ...formulaForm, isian_mode: e.target.value })}
-            className="w-full border border-slate-300 rounded-xl px-3 py-2 text-xs"
-          >
-            <option value="CASE_INSENSITIVE">Abaikan Kapital</option>
-            <option value="CASE_SENSITIVE">Kapital Persis</option>
-          </select>
-        </div>
-        <div>
-          <label className="block text-xs font-bold text-slate-700 mb-1">KKM Madrasah</label>
+          <label className="block text-xs font-bold text-slate-700 mb-1">KKM</label>
           <input
             type="number"
             value={formulaForm.kkm}
-            onChange={(e) => setFormulaForm({ ...formulaForm, kkm: Number(e.target.value) })}
+            onChange={(e) => setFormulaForm({ ...formulaForm, kkm: Number(e.target.value) || 75 })}
             className="w-full border border-slate-300 rounded-xl px-3 py-2 text-xs"
           />
         </div>
-        <button
-          type="button"
-          onClick={() => onSaveFormula(formulaForm)}
-          className="px-4 py-2 rounded-xl bg-emerald-700 text-white text-xs font-bold"
-        >
-          Simpan Rumus Nilai
-        </button>
-      </div>
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <select
-          value={selectedExamId}
-          onChange={(e) => setSelectedExamId(e.target.value)}
-          className="bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold min-w-[240px]"
-        >
-          <option value="">Semua Paket Ujian</option>
-          {exams.map((ex) => (
-            <option key={ex.id} value={ex.id}>
-              {ex.title}
-            </option>
-          ))}
-        </select>
-        {selectedExamId && (
+        <div className="flex gap-2">
+          <button
+            type="button"
+            onClick={() => onSaveFormula(formulaForm)}
+            className="px-3 py-2 rounded-xl border border-emerald-700 text-emerald-700 text-xs font-bold flex items-center gap-1"
+          >
+            <Save className="w-3.5 h-3.5" />
+            Simpan Rumus
+          </button>
           <button
             type="button"
             onClick={handleRecalculateExam}
-            className="px-3.5 py-2 rounded-xl border border-emerald-700 text-emerald-800 bg-emerald-50 text-xs font-bold flex items-center gap-1.5"
+            className="px-3 py-2 rounded-xl bg-emerald-700 text-white text-xs font-bold flex items-center gap-1"
           >
             <RefreshCw className="w-3.5 h-3.5" />
-            Hitung Ulang Nilai
+            Hitung Ulang
           </button>
-        )}
+        </div>
       </div>
       <div className="bg-white border border-slate-200 rounded-2xl overflow-x-auto">
         <table className="w-full text-xs">
           <thead className="bg-slate-50 border-b border-slate-200 font-bold text-slate-700">
             <tr>
               <th className="p-3 text-left">Nama Siswa</th>
-              <th className="p-3 text-left">Paket Ujian</th>
+              <th className="p-3 text-left">Ujian</th>
               <th className="p-3 text-center">Benar</th>
               <th className="p-3 text-center">Salah</th>
               <th className="p-3 text-center">Kosong</th>
               <th className="p-3 text-center">Nilai</th>
-              <th className="p-3 text-center">Ketuntasan</th>
+              <th className="p-3 text-center">Keterangan</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
             {filteredResults.length === 0 ? (
               <tr>
                 <td colSpan={7} className="p-6 text-center text-slate-500">
-                  Belum ada hasil ujian tersimpan.
+                  Belum ada data hasil ujian.
                 </td>
               </tr>
             ) : (
               filteredResults.map((r) => {
-                const tuntas = Number(r.score) >= (formulaForm.kkm || 75);
+                const passed = Number(r.score) >= Number(formulaForm.kkm || 75);
                 return (
                   <tr key={r.id}>
                     <td className="p-3 font-bold text-slate-900">{r.student_name}</td>
-                    <td className="p-3">{r.exam_title}</td>
+                    <td className="p-3">{r.exam_title || "-"}</td>
                     <td className="p-3 text-center text-emerald-700 font-bold">{r.correct_count}</td>
                     <td className="p-3 text-center text-red-600 font-bold">{r.wrong_count}</td>
                     <td className="p-3 text-center text-slate-500">{r.empty_count}</td>
-                    <td className="p-3 text-center font-extrabold">{r.score}</td>
+                    <td className="p-3 text-center font-extrabold text-sm">{r.score}</td>
                     <td className="p-3 text-center">
                       <span
                         className={`px-2 py-0.5 rounded-full text-[11px] font-bold ${
-                          tuntas ? "bg-emerald-50 text-emerald-800" : "bg-red-50 text-red-700"
+                          passed ? "bg-emerald-50 text-emerald-800" : "bg-amber-50 text-amber-800"
                         }`}
                       >
-                        {tuntas ? "Tuntas" : "Belum Tuntas"}
+                        {passed ? "Tuntas" : "Remedial"}
                       </span>
                     </td>
                   </tr>
@@ -5832,13 +6064,12 @@ function ResultsAndGradingView({
 }
 
 // ============================================================================
-// MODUL 9: ANALISIS BUTIR SOAL (TINGKAT KESUKARAN & DAYA PEMBEDA)
+// MODUL 9: ANALISIS BUTIR SOAL & LAPORAN RESMI BERKOP
 // ============================================================================
 function ItemAnalysisView({
   exams,
   questions,
   studentAnswers,
-  examResults,
   subjects,
   schoolSettings,
   documentSettings,
@@ -5846,121 +6077,75 @@ function ItemAnalysisView({
   showBanner
 }) {
   const [selectedExamId, setSelectedExamId] = useState("");
-  const analysisRows = useMemo(() => {
-    if (!selectedExamId) return [];
+  const rows = useMemo(() => {
     const exam = exams.find((e) => e.id === selectedExamId);
     if (!exam) return [];
     const qIds = Array.isArray(exam.question_ids) ? exam.question_ids : [];
-    const examQs = qIds.map((id) => questions.find((q) => q.id === id)).filter(Boolean);
-    const results = examResults
-      .filter((r) => r.exam_id === selectedExamId)
-      .sort((a, b) => Number(b.score) - Number(a.score));
-    const totalParticipants = results.length;
-    const groupSize = totalParticipants >= 6 ? Math.max(1, Math.round(totalParticipants * 0.27)) : 0;
-    const upperIds = new Set(results.slice(0, groupSize).map((r) => r.student_id));
-    const lowerIds = new Set(
-      groupSize > 0 ? results.slice(totalParticipants - groupSize).map((r) => r.student_id) : []
+    const examAns = studentAnswers.filter((a) => a.exam_id === exam.id);
+    const totalRespondents = Math.max(
+      1,
+      new Set(examAns.map((a) => a.student_id)).size
     );
-    return examQs.map((q, idx) => {
-      let correct = 0;
-      let wrong = 0;
-      let upperCorrect = 0;
-      let lowerCorrect = 0;
-      results.forEach((res) => {
-        const ans = studentAnswers.find(
-          (a) =>
-            a.exam_id === selectedExamId &&
-            a.student_id === res.student_id &&
-            a.question_id === q.id
-        );
-        const ev = evaluateSingleQuestionAnswer(q, ans?.answer);
-        if (ev.status === "CORRECT") {
-          correct++;
-          if (upperIds.has(res.student_id)) upperCorrect++;
-          if (lowerIds.has(res.student_id)) lowerCorrect++;
-        } else {
-          wrong++;
-        }
-      });
-      const pIndex = totalParticipants >= 3 ? Number((correct / totalParticipants).toFixed(2)) : null;
-      const difficultyLabel =
-        pIndex === null
-          ? "Data belum memadai (<3)"
-          : pIndex > 0.7
-            ? "Mudah"
-            : pIndex >= 0.3
-              ? "Sedang"
-              : "Sukar";
-      const dIndex =
-        groupSize > 0 ? Number(((upperCorrect - lowerCorrect) / groupSize).toFixed(2)) : null;
-      const discriminationLabel =
-        dIndex === null
-          ? "Data belum memadai (<6)"
-          : dIndex >= 0.4
-            ? "Sangat Baik"
-            : dIndex >= 0.3
-              ? "Baik"
-              : dIndex >= 0.2
-                ? "Cukup"
-                : "Perlu Revisi";
-      return {
-        no: idx + 1,
-        question_text: q.question_text,
-        correct,
-        wrong,
-        pIndex: pIndex !== null ? pIndex : "-",
-        difficultyLabel,
-        dIndex: dIndex !== null ? dIndex : "-",
-        discriminationLabel
-      };
-    });
-  }, [selectedExamId, exams, questions, studentAnswers, examResults]);
+    return qIds
+      .map((qid, idx) => {
+        const q = questions.find((item) => item.id === qid);
+        if (!q) return null;
+        const qAns = examAns.filter((a) => a.question_id === qid);
+        const correctResp = qAns.filter(
+          (a) => evaluateSingleQuestionAnswer(q, a.answer).status === "CORRECT"
+        ).length;
+        const difficultyIndex = Number((correctResp / totalRespondents).toFixed(2));
+        const category =
+          difficultyIndex >= 0.7 ? "Mudah" : difficultyIndex >= 0.3 ? "Sedang" : "Sukar";
+        return {
+          no: idx + 1,
+          question_text: q.question_text,
+          correctResp,
+          totalRespondents,
+          difficultyIndex,
+          category
+        };
+      })
+      .filter(Boolean);
+  }, [exams, questions, studentAnswers, selectedExamId]);
 
   const handlePrintAnalysis = () => {
     const exam = exams.find((e) => e.id === selectedExamId);
-    if (!exam || analysisRows.length === 0) {
-      return showBanner("error", "Pilih ujian yang memiliki data hasil untuk dicetak.");
+    if (!exam || rows.length === 0) {
+      return showBanner("error", "Pilih ujian yang memiliki butir soal untuk dicetak.");
     }
     const sub = subjects.find((s) => s.id === exam.subject_id);
-    const bodyHtml = `
-      <table class="data-table">
-        <thead>
-          <tr>
-            <th>No</th>
-            <th>Butir Soal</th>
-            <th>Benar</th>
-            <th>Salah</th>
-            <th>Indeks P</th>
-            <th>Kesukaran</th>
-            <th>Daya Beda</th>
-            <th>Kualitas</th>
-          </tr>
-        </thead>
-        <tbody>
-          ${analysisRows
-            .map(
-              (r) => `<tr>
+    const bodyHtml = `<table class="data-table">
+      <thead>
+        <tr>
+          <th>No</th>
+          <th>Butir Soal</th>
+          <th>Benar / Peserta</th>
+          <th>Tingkat Kesukaran</th>
+          <th>Kategori</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${rows
+          .map(
+            (r) => `<tr>
               <td style="text-align:center;">${r.no}</td>
               <td>${escapeHtml(r.question_text)}</td>
-              <td style="text-align:center;">${r.correct}</td>
-              <td style="text-align:center;">${r.wrong}</td>
-              <td style="text-align:center;">${r.pIndex}</td>
-              <td style="text-align:center;">${r.difficultyLabel}</td>
-              <td style="text-align:center;">${r.dIndex}</td>
-              <td style="text-align:center;">${r.discriminationLabel}</td>
+              <td style="text-align:center;">${r.correctResp} / ${r.totalRespondents}</td>
+              <td style="text-align:center;">${r.difficultyIndex}</td>
+              <td style="text-align:center;">${r.category}</td>
             </tr>`
-            )
-            .join("")}
-        </tbody>
-      </table>
-    `;
+          )
+          .join("")}
+      </tbody>
+    </table>`;
     const html = buildOfficialDocumentHtml({
       title: "LAPORAN ANALISIS BUTIR SOAL",
-      subtitle: exam.title,
+      subtitle: `${exam.title} • Mapel: ${sub?.name || "-"}`,
       metaRows: [
-        { label: "Paket Ujian", value: exam.title },
+        { label: "Nama Ujian", value: exam.title },
         { label: "Mata Pelajaran", value: sub?.name || "-" },
-        { label: "Jumlah Butir Soal", value: `${analysisRows.length} Butir` }
+        { label: "Jumlah Butir Soal", value: `${rows.length} Soal` }
       ],
       bodyHtml,
       schoolSettings,
@@ -5972,29 +6157,27 @@ function ItemAnalysisView({
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-center justify-between gap-3">
+      <div className="bg-white border border-slate-200 rounded-2xl p-4 flex flex-wrap items-center justify-between gap-3">
         <select
           value={selectedExamId}
           onChange={(e) => setSelectedExamId(e.target.value)}
-          className="bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold min-w-[260px]"
+          className="border border-slate-300 rounded-xl px-3 py-2 text-xs min-w-[260px]"
         >
-          <option value="">-- Pilih Ujian untuk Dianalisis --</option>
+          <option value="">-- Pilih Paket Ujian untuk Dianalisis --</option>
           {exams.map((ex) => (
             <option key={ex.id} value={ex.id}>
               {ex.title}
             </option>
           ))}
         </select>
-        {selectedExamId && analysisRows.length > 0 && (
-          <button
-            type="button"
-            onClick={handlePrintAnalysis}
-            className="px-3.5 py-2 rounded-xl bg-emerald-700 text-white text-xs font-bold flex items-center gap-1.5"
-          >
-            <Printer className="w-4 h-4" />
-            Cetak Analisis PDF Berkop
-          </button>
-        )}
+        <button
+          type="button"
+          onClick={handlePrintAnalysis}
+          className="px-4 py-2 rounded-xl bg-emerald-700 text-white text-xs font-bold flex items-center gap-1.5"
+        >
+          <Printer className="w-4 h-4" />
+          Cetak Analisis PDF
+        </button>
       </div>
       <div className="bg-white border border-slate-200 rounded-2xl overflow-x-auto">
         <table className="w-full text-xs">
@@ -6002,32 +6185,28 @@ function ItemAnalysisView({
             <tr>
               <th className="p-3 text-center">No</th>
               <th className="p-3 text-left">Butir Soal</th>
-              <th className="p-3 text-center">Benar</th>
-              <th className="p-3 text-center">Salah</th>
-              <th className="p-3 text-center">Indeks P</th>
-              <th className="p-3 text-center">Tingkat Kesukaran</th>
-              <th className="p-3 text-center">Daya Beda</th>
-              <th className="p-3 text-center">Interpretasi</th>
+              <th className="p-3 text-center">Benar / Responden</th>
+              <th className="p-3 text-center">Indeks Kesukaran</th>
+              <th className="p-3 text-center">Kategori</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
-            {analysisRows.length === 0 ? (
+            {rows.length === 0 ? (
               <tr>
-                <td colSpan={8} className="p-6 text-center text-slate-500">
-                  Pilih ujian untuk melihat analisis tingkat kesukaran dan daya pembeda soal.
+                <td colSpan={5} className="p-6 text-center text-slate-500">
+                  Pilih ujian di atas untuk melihat analisis butir soal.
                 </td>
               </tr>
             ) : (
-              analysisRows.map((r) => (
+              rows.map((r) => (
                 <tr key={r.no}>
                   <td className="p-3 text-center font-bold">{r.no}</td>
-                  <td className="p-3 max-w-md">{r.question_text}</td>
-                  <td className="p-3 text-center text-emerald-700 font-bold">{r.correct}</td>
-                  <td className="p-3 text-center text-red-600 font-bold">{r.wrong}</td>
-                  <td className="p-3 text-center font-mono">{r.pIndex}</td>
-                  <td className="p-3 text-center">{r.difficultyLabel}</td>
-                  <td className="p-3 text-center font-mono">{r.dIndex}</td>
-                  <td className="p-3 text-center font-bold">{r.discriminationLabel}</td>
+                  <td className="p-3">{r.question_text}</td>
+                  <td className="p-3 text-center">
+                    {r.correctResp} / {r.totalRespondents}
+                  </td>
+                  <td className="p-3 text-center font-mono font-bold">{r.difficultyIndex}</td>
+                  <td className="p-3 text-center font-bold">{r.category}</td>
                 </tr>
               ))
             )}
@@ -6038,9 +6217,6 @@ function ItemAnalysisView({
   );
 }
 
-// ============================================================================
-// MODUL 10: LAPORAN RESMI BERKOP (PDF / PRINT, EXCEL .XLSX & WORD .DOC)
-// ============================================================================
 function OfficialReportsView({
   exams,
   students,
@@ -6055,126 +6231,159 @@ function OfficialReportsView({
 }) {
   const [selectedExamId, setSelectedExamId] = useState("");
   const [selectedClassId, setSelectedClassId] = useState("");
-  const rows = useMemo(() => {
-    const list = selectedExamId
-      ? examResults.filter((r) => r.exam_id === selectedExamId)
-      : examResults;
-    return list
-      .map((r) => {
-        const st = students.find((s) => s.id === r.student_id);
-        const cls = classesList.find((c) => c.id === st?.class_id);
-        return {
-          ...r,
-          nisn: st?.nisn || "-",
-          class_id: st?.class_id || "",
-          class_name: cls?.name || "-"
-        };
-      })
-      .filter((r) => !selectedClassId || r.class_id === selectedClassId);
-  }, [examResults, students, classesList, selectedExamId, selectedClassId]);
 
-  const buildReportHtml = () => {
-    const exam = exams.find((e) => e.id === selectedExamId);
-    const cls = classesList.find((c) => c.id === selectedClassId);
-    const bodyHtml = `
-      <table class="data-table">
-        <thead>
-          <tr>
-            <th style="width:36px;">No</th>
-            <th>NISN</th>
-            <th>Nama Siswa</th>
-            <th>Kelas</th>
-            <th>Paket Ujian</th>
-            <th>Benar</th>
-            <th>Salah</th>
-            <th>Nilai</th>
-          </tr>
-        </thead>
-        <tbody>
-          ${rows
-            .map(
-              (r, idx) => `<tr>
-              <td style="text-align:center;">${idx + 1}</td>
-              <td>${escapeHtml(r.nisn)}</td>
-              <td>${escapeHtml(r.student_name)}</td>
-              <td style="text-align:center;">${escapeHtml(r.class_name)}</td>
-              <td>${escapeHtml(r.exam_title)}</td>
-              <td style="text-align:center;">${r.correct_count}</td>
-              <td style="text-align:center;">${r.wrong_count}</td>
-              <td style="text-align:center; font-weight:bold;">${r.score}</td>
-            </tr>`
-            )
-            .join("")}
-        </tbody>
-      </table>
-    `;
-    return buildOfficialDocumentHtml({
-      title: "LAPORAN HASIL UJIAN PESERTA DIDIK",
-      subtitle: `${exam ? exam.title : "Semua Ujian"} ${cls ? `• Kelas ${cls.name}` : ""}`,
+  const filteredResults = useMemo(() => {
+    return examResults.filter((r) => {
+      const matchExam = !selectedExamId || r.exam_id === selectedExamId;
+      if (!matchExam) return false;
+      if (!selectedClassId) return true;
+      const st = students.find(
+        (s) => s.id === r.student_id || s.full_name === r.student_name
+      );
+      const part = participants.find(
+        (p) => p.exam_id === r.exam_id && p.student_id === r.student_id
+      );
+      const clsId = st?.class_id || part?.class_id || "";
+      return clsId === selectedClassId;
+    });
+  }, [examResults, selectedExamId, selectedClassId, students, participants]);
+
+  const examObj = exams.find((e) => e.id === selectedExamId);
+  const subObj = subjects.find((s) => s.id === examObj?.subject_id);
+  const clsObj = classesList.find((c) => c.id === selectedClassId);
+
+  const buildReportTableHtml = () => `<table class="data-table">
+    <thead>
+      <tr>
+        <th style="width:36px;">No</th>
+        <th>Nama Peserta</th>
+        <th>Kelas</th>
+        <th>Ujian</th>
+        <th style="width:65px;">Benar</th>
+        <th style="width:65px;">Salah</th>
+        <th style="width:75px;">Nilai</th>
+      </tr>
+    </thead>
+    <tbody>
+      ${filteredResults
+        .map((r, i) => {
+          const st = students.find(
+            (s) => s.id === r.student_id || s.full_name === r.student_name
+          );
+          const part = participants.find(
+            (p) => p.exam_id === r.exam_id && p.student_id === r.student_id
+          );
+          const cname =
+            classesList.find((c) => c.id === (st?.class_id || part?.class_id))?.name || "-";
+          return `<tr>
+            <td style="text-align:center;">${i + 1}</td>
+            <td>${escapeHtml(r.student_name)}</td>
+            <td style="text-align:center;">${escapeHtml(cname)}</td>
+            <td>${escapeHtml(r.exam_title || examObj?.title || "-")}</td>
+            <td style="text-align:center;">${r.correct_count}</td>
+            <td style="text-align:center;">${r.wrong_count}</td>
+            <td style="text-align:center; font-weight:bold;">${r.score}</td>
+          </tr>`;
+        })
+        .join("")}
+    </tbody>
+  </table>`;
+
+  const handlePrintPdf = () => {
+    if (filteredResults.length === 0) {
+      return showBanner("error", "Tidak ada data nilai untuk dicetak.");
+    }
+    const html = buildOfficialDocumentHtml({
+      title: "REKAPITULASI HASIL UJIAN RESMI",
+      subtitle: `${schoolSettings.school_name} • Tahun Pelajaran ${schoolSettings.academic_year}`,
       metaRows: [
-        { label: "Paket Ujian", value: exam?.title || "Semua Ujian" },
-        { label: "Kelas", value: cls?.name || "Semua Kelas" },
-        { label: "Tahun Pelajaran", value: schoolSettings.academic_year },
-        { label: "Jumlah Data", value: `${rows.length} Siswa` }
+        { label: "Paket Ujian", value: examObj?.title || "Semua Ujian" },
+        { label: "Mata Pelajaran", value: subObj?.name || "-" },
+        { label: "Kelas", value: clsObj?.name || "Semua Kelas" },
+        { label: "Jumlah Siswa", value: `${filteredResults.length} Siswa` }
       ],
-      bodyHtml,
+      bodyHtml: buildReportTableHtml(),
       schoolSettings,
       documentSettings,
       isSimulation
     });
-  };
-
-  const handlePrintPdf = () => {
-    if (rows.length === 0) return showBanner("error", "Tidak ada data nilai untuk dicetak.");
-    openPrintDocumentWindow(buildReportHtml());
+    openPrintDocumentWindow(html);
   };
 
   const handleExportExcel = async () => {
-    if (rows.length === 0) return showBanner("error", "Tidak ada data nilai untuk diunduh.");
+    if (filteredResults.length === 0) {
+      return showBanner("error", "Tidak ada data nilai untuk diunduh.");
+    }
     await exportOfficialExcelWithKop({
-      filename: "Laporan_Hasil_Ujian_MIN4.xlsx",
-      sheetName: "Hasil_Ujian",
-      title: "LAPORAN HASIL UJIAN PESERTA DIDIK",
-      subtitle: `${schoolSettings.school_name} • Tahun Pelajaran ${schoolSettings.academic_year}`,
+      filename: `Rekap_Nilai_${(examObj?.title || "MIN4").replace(/\s+/g, "_")}.xlsx`,
+      sheetName: "Rekap_Nilai",
+      title: "REKAPITULASI HASIL UJIAN RESMI",
+      subtitle: `${schoolSettings.school_name} • TP ${schoolSettings.academic_year}`,
       columns: [
         { key: "no", label: "No", width: 8 },
-        { key: "nisn", label: "NISN", width: 18 },
         { key: "nama", label: "Nama Siswa", width: 32 },
         { key: "kelas", label: "Kelas", width: 14 },
-        { key: "ujian", label: "Paket Ujian", width: 28 },
+        { key: "ujian", label: "Ujian", width: 28 },
         { key: "benar", label: "Benar", width: 10 },
         { key: "salah", label: "Salah", width: 10 },
         { key: "nilai", label: "Nilai", width: 12 }
       ],
-      rows: rows.map((r, i) => ({
-        no: i + 1,
-        nisn: r.nisn,
-        nama: r.student_name,
-        kelas: r.class_name,
-        ujian: r.exam_title,
-        benar: r.correct_count,
-        salah: r.wrong_count,
-        nilai: r.score
-      })),
+      rows: filteredResults.map((r, i) => {
+        const st = students.find(
+          (s) => s.id === r.student_id || s.full_name === r.student_name
+        );
+        const part = participants.find(
+          (p) => p.exam_id === r.exam_id && p.student_id === r.student_id
+        );
+        const cname =
+          classesList.find((c) => c.id === (st?.class_id || part?.class_id))?.name || "-";
+        return {
+          no: i + 1,
+          nama: r.student_name,
+          kelas: cname,
+          ujian: r.exam_title || examObj?.title || "-",
+          benar: r.correct_count,
+          salah: r.wrong_count,
+          nilai: r.score
+        };
+      }),
       documentSettings,
       isSimulation
     });
   };
 
   const handleExportWord = () => {
-    if (rows.length === 0) return showBanner("error", "Tidak ada data nilai untuk diunduh.");
-    downloadWordDocFile("Laporan_Hasil_Ujian_MIN4.doc", buildReportHtml());
-    showBanner("success", "Dokumen Word (.doc) berkop berhasil diunduh.");
+    if (filteredResults.length === 0) {
+      return showBanner("error", "Tidak ada data nilai untuk diunduh.");
+    }
+    const html = buildOfficialDocumentHtml({
+      title: "REKAPITULASI HASIL UJIAN RESMI",
+      subtitle: `${schoolSettings.school_name} • Tahun Pelajaran ${schoolSettings.academic_year}`,
+      metaRows: [
+        { label: "Paket Ujian", value: examObj?.title || "Semua Ujian" },
+        { label: "Mata Pelajaran", value: subObj?.name || "-" },
+        { label: "Kelas", value: clsObj?.name || "Semua Kelas" }
+      ],
+      bodyHtml: buildReportTableHtml(),
+      schoolSettings,
+      documentSettings,
+      isSimulation
+    });
+    const prefix = isSimulation ? "SIMULASI_" : "";
+    downloadWordDocFile(
+      `${prefix}Rekap_Nilai_${(examObj?.title || "MIN4").replace(/\s+/g, "_")}.doc`,
+      html
+    );
   };
 
   return (
     <div className="space-y-4">
       <div className="bg-white border border-slate-200 rounded-2xl p-4 flex flex-wrap items-center justify-between gap-3">
-        <div className="flex flex-wrap gap-3">
+        <div className="flex flex-wrap gap-2">
           <select
             value={selectedExamId}
             onChange={(e) => setSelectedExamId(e.target.value)}
-            className="border border-slate-300 rounded-xl px-3 py-2 text-xs font-semibold"
+            className="border border-slate-300 rounded-xl px-3 py-2 text-xs"
           >
             <option value="">Semua Ujian</option>
             {exams.map((ex) => (
@@ -6186,7 +6395,7 @@ function OfficialReportsView({
           <select
             value={selectedClassId}
             onChange={(e) => setSelectedClassId(e.target.value)}
-            className="border border-slate-300 rounded-xl px-3 py-2 text-xs font-semibold"
+            className="border border-slate-300 rounded-xl px-3 py-2 text-xs"
           >
             <option value="">Semua Kelas</option>
             {classesList.map((c) => (
@@ -6197,14 +6406,6 @@ function OfficialReportsView({
           </select>
         </div>
         <div className="flex flex-wrap gap-2">
-          <button
-            type="button"
-            onClick={handlePrintPdf}
-            className="px-3.5 py-2 rounded-xl bg-emerald-700 text-white text-xs font-bold flex items-center gap-1.5"
-          >
-            <Printer className="w-4 h-4" />
-            Cetak / PDF
-          </button>
           <button
             type="button"
             onClick={handleExportExcel}
@@ -6218,8 +6419,16 @@ function OfficialReportsView({
             onClick={handleExportWord}
             className="px-3.5 py-2 rounded-xl border border-slate-300 bg-white text-xs font-bold flex items-center gap-1.5"
           >
-            <Download className="w-4 h-4 text-blue-700" />
+            <FileText className="w-4 h-4 text-blue-700" />
             Unduh Word (.doc)
+          </button>
+          <button
+            type="button"
+            onClick={handlePrintPdf}
+            className="px-3.5 py-2 rounded-xl bg-emerald-700 text-white text-xs font-bold flex items-center gap-1.5"
+          >
+            <Printer className="w-4 h-4" />
+            Cetak PDF Resmi
           </button>
         </div>
       </div>
@@ -6227,27 +6436,27 @@ function OfficialReportsView({
         <table className="w-full text-xs">
           <thead className="bg-slate-50 border-b border-slate-200 font-bold text-slate-700">
             <tr>
-              <th className="p-3 text-left">NISN</th>
               <th className="p-3 text-left">Nama Siswa</th>
-              <th className="p-3 text-center">Kelas</th>
-              <th className="p-3 text-left">Paket Ujian</th>
+              <th className="p-3 text-left">Ujian</th>
+              <th className="p-3 text-center">Benar</th>
+              <th className="p-3 text-center">Salah</th>
               <th className="p-3 text-center">Nilai</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
-            {rows.length === 0 ? (
+            {filteredResults.length === 0 ? (
               <tr>
                 <td colSpan={5} className="p-6 text-center text-slate-500">
-                  Belum ada data laporan hasil ujian.
+                  Belum ada data laporan nilai.
                 </td>
               </tr>
             ) : (
-              rows.map((r) => (
+              filteredResults.map((r) => (
                 <tr key={r.id}>
-                  <td className="p-3 font-mono">{r.nisn}</td>
                   <td className="p-3 font-bold">{r.student_name}</td>
-                  <td className="p-3 text-center">{r.class_name}</td>
-                  <td className="p-3">{r.exam_title}</td>
+                  <td className="p-3">{r.exam_title || "-"}</td>
+                  <td className="p-3 text-center">{r.correct_count}</td>
+                  <td className="p-3 text-center">{r.wrong_count}</td>
                   <td className="p-3 text-center font-extrabold">{r.score}</td>
                 </tr>
               ))
@@ -6260,24 +6469,24 @@ function OfficialReportsView({
 }
 
 // ============================================================================
-// MODUL 11: PENGATURAN DOKUMEN & KOP SURAT TERPUSAT
+// MODUL 10: PENGATURAN TEMPLATE DOKUMEN & KOP SURAT TERPUSAT
 // ============================================================================
 function DocumentSettingsView({
-  supabase,
   schoolSettings,
   documentSettings,
   onSaveDocumentSettings,
   showBanner
 }) {
-  const [docForm, setDocForm] = useState(documentSettings);
+  const [docForm, setDocForm] = useState({ ...DEFAULT_DOCUMENT_SETTINGS, ...documentSettings });
   useEffect(() => {
-    setDocForm(documentSettings);
+    setDocForm({ ...DEFAULT_DOCUMENT_SETTINGS, ...documentSettings });
   }, [documentSettings]);
-  const handleKopFileChange = (e) => {
+
+  const handleKopFileUpload = (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
     if (file.size > 2 * 1024 * 1024) {
-      return showBanner("error", "Ukuran gambar kop maksimal 2 MB.");
+      return showBanner("error", "Ukuran gambar kop surat maksimal 2 MB.");
     }
     const reader = new FileReader();
     reader.onloadend = () => {
@@ -6285,37 +6494,106 @@ function DocumentSettingsView({
     };
     reader.readAsDataURL(file);
   };
-  const handlePreviewDoc = () => {
-    const html = buildOfficialDocumentHtml({
+
+  const handlePreview = () => {
+    const previewHtml = buildOfficialDocumentHtml({
       title: "CONTOH DOKUMEN RESMI BERKOP",
-      subtitle: "Pratinjau Kop Surat, Margin, Kertas, dan Footer",
+      subtitle: "Pratinjau Kop Surat, Margin, dan Footer Terpusat",
       metaRows: [
         { label: "Madrasah", value: schoolSettings.school_name },
+        { label: "Tahun Pelajaran", value: schoolSettings.academic_year },
         { label: "Ukuran Kertas", value: `${docForm.paper_size} (${docForm.orientation})` }
       ],
-      bodyHtml: `<p>Dokumen ini menampilkan pratinjau kop resmi MIN 4 Magelang sesuai pengaturan margin dan footer yang aktif.</p>`,
+      bodyHtml:
+        "<p style='font-size:10.5pt;'>Dokumen ini menampilkan pratinjau kop resmi MIN 4 Magelang yang digunakan secara terpusat pada cetak PDF, ekspor Excel (.xlsx), dan dokumen Word (.doc).</p>",
       schoolSettings,
       documentSettings: docForm
     });
-    openPrintDocumentWindow(html);
+    openPrintDocumentWindow(previewHtml);
   };
+
   return (
-    <div className="bg-white border border-slate-200 rounded-2xl p-5 space-y-4 shadow-sm text-xs">
-      <h2 className="text-sm font-extrabold text-slate-900">
-        Pengaturan Template Dokumen & Kop Surat Resmi
-      </h2>
-      <div className="border border-slate-200 rounded-xl p-3 bg-slate-50">
+    <div className="bg-white border border-slate-200 rounded-2xl p-5 space-y-5 shadow-sm">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div>
+          <h2 className="text-sm font-extrabold text-slate-900">
+            Pengaturan Template Dokumen & Kop Surat Terpusat
+          </h2>
+          <p className="text-xs text-slate-500">
+            Mengatur kop resmi MIN 4 Magelang, ukuran kertas, orientasi, margin, dan footer untuk
+            seluruh cetak & ekspor.
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={handlePreview}
+          className="px-3.5 py-2 rounded-xl border border-emerald-700 text-emerald-700 text-xs font-bold flex items-center gap-1.5"
+        >
+          <Printer className="w-4 h-4" />
+          Pratinjau Cetak
+        </button>
+      </div>
+      <div className="border border-slate-200 rounded-2xl p-4 bg-slate-50 space-y-3">
+        <div className="text-xs font-extrabold text-slate-800">Kop Surat Resmi Saat Ini</div>
         <img
           src={docForm.kop_image || DEFAULT_KOP_IMAGE_SRC}
           alt="Kop Resmi MIN 4 Magelang"
-          className="w-full max-h-32 object-contain mx-auto"
+          className="w-full max-h-36 object-contain bg-white border border-slate-200 rounded-xl p-2"
         />
-      </div>
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-        <div>
-          <label className="block font-bold text-slate-700 mb-1">Ganti Gambar Kop Surat</label>
-          <input type="file" accept="image/*" onChange={handleKopFileChange} />
+        <div className="flex flex-wrap items-center gap-3 text-xs">
+          <label className="cursor-pointer px-3 py-1.5 rounded-xl bg-white border border-slate-300 font-bold">
+            Ganti Gambar Kop Surat
+            <input
+              type="file"
+              accept="image/*"
+              onChange={handleKopFileUpload}
+              className="hidden"
+            />
+          </label>
+          <button
+            type="button"
+            onClick={() => setDocForm((prev) => ({ ...prev, kop_image: DEFAULT_KOP_IMAGE_SRC }))}
+            className="px-3 py-1.5 rounded-xl bg-white border border-slate-300 font-bold text-slate-700"
+          >
+            Gunakan Kop Default MIN 4
+          </button>
         </div>
+      </div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 text-xs">
+        <label className="flex items-center gap-2 font-bold text-slate-700">
+          <input
+            type="checkbox"
+            checked={Boolean(docForm.use_kop_pdf)}
+            onChange={(e) => setDocForm({ ...docForm, use_kop_pdf: e.target.checked })}
+          />
+          Kop pada Cetak / PDF
+        </label>
+        <label className="flex items-center gap-2 font-bold text-slate-700">
+          <input
+            type="checkbox"
+            checked={Boolean(docForm.use_kop_excel)}
+            onChange={(e) => setDocForm({ ...docForm, use_kop_excel: e.target.checked })}
+          />
+          Kop pada Ekspor Excel
+        </label>
+        <label className="flex items-center gap-2 font-bold text-slate-700">
+          <input
+            type="checkbox"
+            checked={Boolean(docForm.use_kop_word)}
+            onChange={(e) => setDocForm({ ...docForm, use_kop_word: e.target.checked })}
+          />
+          Kop pada Ekspor Word
+        </label>
+        <label className="flex items-center gap-2 font-bold text-slate-700">
+          <input
+            type="checkbox"
+            checked={Boolean(docForm.show_print_date)}
+            onChange={(e) => setDocForm({ ...docForm, show_print_date: e.target.checked })}
+          />
+          Tampilkan Tanggal Cetak
+        </label>
+      </div>
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
         <div>
           <label className="block font-bold text-slate-700 mb-1">Ukuran Kertas</label>
           <select
@@ -6335,141 +6613,265 @@ function DocumentSettingsView({
             onChange={(e) => setDocForm({ ...docForm, orientation: e.target.value })}
             className="w-full border border-slate-300 rounded-xl px-3 py-2"
           >
-            <option value="portrait">Portrait</option>
-            <option value="landscape">Landscape</option>
+            <option value="portrait">Portrait (Tegak)</option>
+            <option value="landscape">Landscape (Mendatar)</option>
           </select>
         </div>
+        <div>
+          <label className="block font-bold text-slate-700 mb-1">Margin (mm: Atas/Bawah/Kiri/Kanan)</label>
+          <div className="grid grid-cols-4 gap-1.5">
+            <input
+              type="number"
+              value={docForm.margin_top_mm}
+              onChange={(e) =>
+                setDocForm({ ...docForm, margin_top_mm: Number(e.target.value) || 15 })
+              }
+              className="border border-slate-300 rounded-lg px-2 py-1.5"
+            />
+            <input
+              type="number"
+              value={docForm.margin_bottom_mm}
+              onChange={(e) =>
+                setDocForm({ ...docForm, margin_bottom_mm: Number(e.target.value) || 15 })
+              }
+              className="border border-slate-300 rounded-lg px-2 py-1.5"
+            />
+            <input
+              type="number"
+              value={docForm.margin_left_mm}
+              onChange={(e) =>
+                setDocForm({ ...docForm, margin_left_mm: Number(e.target.value) || 15 })
+              }
+              className="border border-slate-300 rounded-lg px-2 py-1.5"
+            />
+            <input
+              type="number"
+              value={docForm.margin_right_mm}
+              onChange={(e) =>
+                setDocForm({ ...docForm, margin_right_mm: Number(e.target.value) || 15 })
+              }
+              className="border border-slate-300 rounded-lg px-2 py-1.5"
+            />
+          </div>
+        </div>
       </div>
-      <div className="flex flex-wrap gap-4">
-        <label className="flex items-center gap-2 font-bold">
-          <input
-            type="checkbox"
-            checked={Boolean(docForm.use_kop_pdf)}
-            onChange={(e) => setDocForm({ ...docForm, use_kop_pdf: e.target.checked })}
-          />
-          Kop di PDF / Cetak
-        </label>
-        <label className="flex items-center gap-2 font-bold">
-          <input
-            type="checkbox"
-            checked={Boolean(docForm.use_kop_excel)}
-            onChange={(e) => setDocForm({ ...docForm, use_kop_excel: e.target.checked })}
-          />
-          Kop di Excel (.xlsx)
-        </label>
-        <label className="flex items-center gap-2 font-bold">
-          <input
-            type="checkbox"
-            checked={Boolean(docForm.use_kop_word)}
-            onChange={(e) => setDocForm({ ...docForm, use_kop_word: e.target.checked })}
-          />
-          Kop di Word (.doc)
-        </label>
+      <div className="text-xs">
+        <label className="block font-bold text-slate-700 mb-1">Teks Footer Dokumen</label>
+        <input
+          type="text"
+          value={docForm.footer_text}
+          onChange={(e) => setDocForm({ ...docForm, footer_text: e.target.value })}
+          className="w-full border border-slate-300 rounded-xl px-3 py-2"
+        />
       </div>
-      <div className="flex flex-wrap gap-2">
-        <button
-          type="button"
-          onClick={() => onSaveDocumentSettings(docForm)}
-          className="px-4 py-2 rounded-xl bg-emerald-700 text-white font-extrabold flex items-center gap-1.5"
-        >
-          <Save className="w-4 h-4" />
-          Simpan Pengaturan Dokumen
-        </button>
-        <button
-          type="button"
-          onClick={handlePreviewDoc}
-          className="px-4 py-2 rounded-xl border border-slate-300 font-bold flex items-center gap-1.5"
-        >
-          <Printer className="w-4 h-4" />
-          Pratinjau Cetak
-        </button>
-      </div>
-    </div>
-  );
-}
-
-// ============================================================================
-// MODUL 12: BACKUP DATA JSON
-// ============================================================================
-function BackupDataView({ isSimulation, payload, showBanner }) {
-  const handleDownloadJson = () => {
-    const prefix = isSimulation ? "SIMULASI_" : "";
-    const blob = new Blob([JSON.stringify(payload, null, 2)], {
-      type: "application/json;charset=utf-8"
-    });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `${prefix}Backup_CBT_MIN4_${getLocalTodayIso()}.json`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-    showBanner("success", "File backup JSON berhasil diunduh.");
-  };
-  return (
-    <div className="bg-white border border-slate-200 rounded-2xl p-5 space-y-3 text-xs">
-      <h2 className="text-sm font-extrabold text-slate-900">Backup Data Sistem</h2>
-      <p className="text-slate-600">
-        Unduh salinan cadangan data aktif ({isSimulation ? "Mode Simulasi" : "Data Produksi"}) dalam
-        format JSON.
-      </p>
       <button
         type="button"
-        onClick={handleDownloadJson}
-        className="px-4 py-2.5 rounded-xl bg-emerald-700 text-white font-extrabold flex items-center gap-1.5"
+        onClick={() => onSaveDocumentSettings(docForm)}
+        className="px-4 py-2.5 rounded-xl bg-emerald-700 text-white text-xs font-extrabold"
       >
-        <Download className="w-4 h-4" />
-        Unduh Backup JSON
+        Simpan Pengaturan Dokumen
       </button>
     </div>
   );
 }
 
 // ============================================================================
-// MODUL 13: PENGATURAN & AKUN (KREDENSIAL SUPABASE & DAFTAR PROFIL)
+// MODUL 11: BACKUP DATA & PENGATURAN AKUN / SUPABASE
 // ============================================================================
+function BackupDataView({ isSimulation, payload, showBanner }) {
+  const handleDownloadJson = () => {
+    const prefix = isSimulation ? "SIMULASI_" : "";
+    const blob = new Blob([JSON.stringify(payload, null, 2)], {
+      type: "application/json"
+    });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${prefix}Backup_CBT_MIN4_MAGELANG_${getLocalTodayIso()}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    showBanner("success", "File backup JSON berhasil diunduh.");
+  };
+
+  return (
+    <div className="bg-white border border-slate-200 rounded-2xl p-5 space-y-4">
+      <h2 className="text-sm font-extrabold text-slate-900">Backup Data Sistem</h2>
+      <p className="text-xs text-slate-600">
+        Unduh salinan cadangan data master, bank soal, jadwal ujian, dan hasil ujian dalam format
+        JSON.
+      </p>
+      <button
+        type="button"
+        onClick={handleDownloadJson}
+        className="px-4 py-2.5 rounded-xl bg-emerald-700 text-white text-xs font-extrabold flex items-center gap-2"
+      >
+        <HardDriveDownload className="w-4 h-4" />
+        Unduh Backup JSON
+      </button>
+    </div>
+  );
+}
+
 function AdminSettingsView({
   supabase,
   supabaseUrl,
   supabaseKey,
   profilesList,
-  isSimulation,
   onUpdateCredentials,
+  onRefresh,
   showBanner
 }) {
   const [urlInput, setUrlInput] = useState(supabaseUrl);
   const [keyInput, setKeyInput] = useState(supabaseKey);
+  const [newFullName, setNewFullName] = useState("");
+  const [newUsername, setNewUsername] = useState("");
+  const [newEmail, setNewEmail] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [newRole, setNewRole] = useState("GURU");
+
+  const handleCreateUserAccount = async (e) => {
+    e.preventDefault();
+    if (!supabase) return showBanner("error", "Supabase belum terhubung.");
+    if (newPassword.length < 8) {
+      return showBanner("error", "Password minimal 8 karakter.");
+    }
+    try {
+      const cleanEmail = newEmail.trim().toLowerCase();
+      const cleanUsername = newUsername.trim().toLowerCase();
+      const { data: signUpData, error: signUpErr } = await supabase.auth.signUp({
+        email: cleanEmail,
+        password: newPassword
+      });
+      if (signUpErr) throw signUpErr;
+      const uid = signUpData?.user?.id;
+      if (!uid) {
+        throw new Error(
+          "Akun Auth dibuat namun konfirmasi email aktif di Supabase. Nonaktifkan 'Confirm email' pada Auth Providers Supabase."
+        );
+      }
+      const { error: profErr } = await supabase.from("profiles").insert([
+        {
+          id: uid,
+          full_name: newFullName.trim(),
+          username: cleanUsername,
+          email: cleanEmail,
+          role: newRole,
+          is_active: true,
+          is_simulation: false
+        }
+      ]);
+      if (profErr) throw profErr;
+      setNewFullName("");
+      setNewUsername("");
+      setNewEmail("");
+      setNewPassword("");
+      await onRefresh();
+      showBanner("success", `Akun ${newRole} berhasil dibuat dan aktif.`);
+    } catch (err) {
+      showBanner("error", `Gagal membuat akun: ${err.message}`);
+    }
+  };
+
+  const handleToggleActive = async (prof) => {
+    if (!supabase) return;
+    const { error } = await supabase
+      .from("profiles")
+      .update({ is_active: !prof.is_active })
+      .eq("id", prof.id);
+    if (error) return showBanner("error", error.message);
+    await onRefresh();
+    showBanner("success", `Status akun ${prof.full_name} diperbarui.`);
+  };
+
   return (
-    <div className="space-y-4 text-xs">
+    <div className="space-y-5">
       <div className="bg-white border border-slate-200 rounded-2xl p-5 space-y-3">
         <h2 className="text-sm font-extrabold text-slate-900">Koneksi Supabase</h2>
-        <div>
-          <label className="block font-bold text-slate-700 mb-1">Supabase URL</label>
-          <input
-            type="text"
-            value={urlInput}
-            onChange={(e) => setUrlInput(e.target.value)}
-            className="w-full border border-slate-300 rounded-xl px-3 py-2 font-mono"
-          />
-        </div>
-        <div>
-          <label className="block font-bold text-slate-700 mb-1">Supabase Anon Key</label>
-          <input
-            type="text"
-            value={keyInput}
-            onChange={(e) => setKeyInput(e.target.value)}
-            className="w-full border border-slate-300 rounded-xl px-3 py-2 font-mono"
-          />
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
+          <div>
+            <label className="block font-bold text-slate-700 mb-1">Supabase Project URL</label>
+            <input
+              type="text"
+              value={urlInput}
+              onChange={(e) => setUrlInput(e.target.value)}
+              className="w-full border border-slate-300 rounded-xl px-3 py-2 font-mono"
+            />
+          </div>
+          <div>
+            <label className="block font-bold text-slate-700 mb-1">Supabase Anon Key</label>
+            <input
+              type="text"
+              value={keyInput}
+              onChange={(e) => setKeyInput(e.target.value)}
+              className="w-full border border-slate-300 rounded-xl px-3 py-2 font-mono"
+            />
+          </div>
         </div>
         <button
           type="button"
           onClick={() => onUpdateCredentials(urlInput.trim(), keyInput.trim())}
-          className="px-4 py-2 rounded-xl bg-emerald-700 text-white font-extrabold"
+          className="px-4 py-2 rounded-xl bg-emerald-700 text-white text-xs font-bold"
         >
           Simpan Kredensial Supabase
         </button>
       </div>
+      <form
+        onSubmit={handleCreateUserAccount}
+        className="bg-white border border-slate-200 rounded-2xl p-5 space-y-3"
+      >
+        <h2 className="text-sm font-extrabold text-slate-900">Buat Akun Pengguna (Guru / Admin)</h2>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 text-xs">
+          <input
+            type="text"
+            required
+            placeholder="Nama Lengkap"
+            value={newFullName}
+            onChange={(e) => setNewFullName(e.target.value)}
+            className="border border-slate-300 rounded-xl px-3 py-2"
+          />
+          <input
+            type="text"
+            required
+            placeholder="Username"
+            value={newUsername}
+            onChange={(e) => setNewUsername(e.target.value)}
+            className="border border-slate-300 rounded-xl px-3 py-2"
+          />
+          <input
+            type="email"
+            required
+            placeholder="Email"
+            value={newEmail}
+            onChange={(e) => setNewEmail(e.target.value)}
+            className="border border-slate-300 rounded-xl px-3 py-2"
+          />
+          <input
+            type="password"
+            required
+            minLength={8}
+            placeholder="Password (min 8)"
+            value={newPassword}
+            onChange={(e) => setNewPassword(e.target.value)}
+            className="border border-slate-300 rounded-xl px-3 py-2"
+          />
+          <select
+            value={newRole}
+            onChange={(e) => setNewRole(e.target.value)}
+            className="border border-slate-300 rounded-xl px-3 py-2"
+          >
+            <option value="GURU">GURU</option>
+            <option value="ADMIN">ADMIN</option>
+          </select>
+        </div>
+        <button
+          type="submit"
+          className="px-4 py-2 rounded-xl bg-emerald-700 text-white text-xs font-extrabold"
+        >
+          Buat Akun Pengguna
+        </button>
+      </form>
       <div className="bg-white border border-slate-200 rounded-2xl overflow-x-auto">
         <table className="w-full text-xs">
           <thead className="bg-slate-50 border-b border-slate-200 font-bold text-slate-700">
@@ -6478,25 +6880,29 @@ function AdminSettingsView({
               <th className="p-3 text-left">Username</th>
               <th className="p-3 text-left">Email</th>
               <th className="p-3 text-center">Peran</th>
+              <th className="p-3 text-center">Status</th>
+              <th className="p-3 text-right">Aksi</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
-            {profilesList.length === 0 ? (
-              <tr>
-                <td colSpan={4} className="p-6 text-center text-slate-500">
-                  Belum ada profil pengguna pada ruang ini.
+            {profilesList.map((p) => (
+              <tr key={p.id}>
+                <td className="p-3 font-bold">{p.full_name}</td>
+                <td className="p-3 font-mono">{p.username}</td>
+                <td className="p-3">{p.email}</td>
+                <td className="p-3 text-center font-bold">{p.role}</td>
+                <td className="p-3 text-center">{p.is_active ? "AKTIF" : "NONAKTIF"}</td>
+                <td className="p-3 text-right">
+                  <button
+                    type="button"
+                    onClick={() => handleToggleActive(p)}
+                    className="px-2.5 py-1 rounded-lg border border-slate-300 font-bold"
+                  >
+                    {p.is_active ? "Nonaktifkan" : "Aktifkan"}
+                  </button>
                 </td>
               </tr>
-            ) : (
-              profilesList.map((p) => (
-                <tr key={p.id}>
-                  <td className="p-3 font-bold">{p.full_name}</td>
-                  <td className="p-3 font-mono">{p.username}</td>
-                  <td className="p-3">{p.email}</td>
-                  <td className="p-3 text-center font-bold">{p.role}</td>
-                </tr>
-              ))
-            )}
+            ))}
           </tbody>
         </table>
       </div>
