@@ -54,7 +54,6 @@ class SupabaseRestQueryBuilder {
     this.preferHeaders = [];
     this.singleMode = null;
   }
-
   getHeaders(extra = {}) {
     const token =
       !this.isPublicLookup && this.sessionTokenRef?.current?.access_token
@@ -67,7 +66,6 @@ class SupabaseRestQueryBuilder {
       ...extra
     };
   }
-
   select(columns = "*") {
     if (this.method === "GET") {
       this.queryParams.push(`select=${encodeURIComponent(columns)}`);
@@ -76,19 +74,16 @@ class SupabaseRestQueryBuilder {
     }
     return this;
   }
-
   eq(col, val) {
     this.queryParams.push(`${encodeURIComponent(col)}=eq.${encodeURIComponent(String(val))}`);
     return this;
   }
-
   in(col, vals) {
     const arr = Array.isArray(vals) ? vals : [];
     const formatted = arr.map((v) => `"${String(v).replace(/"/g, "")}"`).join(",");
     this.queryParams.push(`${encodeURIComponent(col)}=in.(${encodeURIComponent(formatted)})`);
     return this;
   }
-
   or(filterStr) {
     const parts = String(filterStr || "")
       .split(",")
@@ -106,57 +101,48 @@ class SupabaseRestQueryBuilder {
     }
     return this;
   }
-
   order(col, opts = {}) {
     const dir = opts.ascending === false ? "desc" : "asc";
     this.queryParams.push(`order=${encodeURIComponent(col)}.${dir}`);
     return this;
   }
-
   limit(n) {
     this.queryParams.push(`limit=${Number(n) || 10}`);
     return this;
   }
-
   insert(rows) {
     this.method = "POST";
     this.bodyData = Array.isArray(rows) ? rows : [rows];
     this.preferHeaders.push("return=representation");
     return this;
   }
-
   update(values) {
     this.method = "PATCH";
     this.bodyData = values;
     this.preferHeaders.push("return=representation");
     return this;
   }
-
   upsert(rowOrRows) {
     this.method = "POST";
     this.bodyData = Array.isArray(rowOrRows) ? rowOrRows : [rowOrRows];
     this.preferHeaders.push("resolution=merge-duplicates", "return=representation");
     return this;
   }
-
   delete() {
     this.method = "DELETE";
     this.preferHeaders.push("return=representation");
     return this;
   }
-
   maybeSingle() {
     this.singleMode = "maybeSingle";
     this.limit(1);
     return this;
   }
-
   single() {
     this.singleMode = "single";
     this.limit(1);
     return this;
   }
-
   async execute() {
     try {
       const qs = this.queryParams.length > 0 ? `?${this.queryParams.join("&")}` : "";
@@ -195,7 +181,6 @@ class SupabaseRestQueryBuilder {
       return { data: null, error: { message: err?.message || "Kesalahan jaringan Supabase." } };
     }
   }
-
   then(resolve, reject) {
     return this.execute().then(resolve, reject);
   }
@@ -218,7 +203,6 @@ function createSupabaseClient(url, anonKey, options = {}) {
         })()
       : null
   };
-
   const saveSession = (sess) => {
     sessionRef.current = sess;
     if (persist) {
@@ -230,7 +214,6 @@ function createSupabaseClient(url, anonKey, options = {}) {
       }
     }
   };
-
   return {
     from(table) {
       const publicLookup = table === "profiles" && !sessionRef.current?.access_token;
@@ -321,7 +304,6 @@ function createSupabaseClient(url, anonKey, options = {}) {
 const DEFAULT_SUPABASE_URL = "https://qlyajgeyuyjbjvsmcdjj.supabase.co";
 const DEFAULT_SUPABASE_ANON_KEY = "sb_publishable_Xpj_iUpn2C-hA0QlKOLmLg_GnXTJZ6k";
 const DEFAULT_KOP_IMAGE_SRC = "/image_3fe900.png";
-
 const DEFAULT_SCHOOL_SETTINGS = {
   school_name: "MIN 4 MAGELANG",
   app_name: "CBT MIN 4 MAGELANG",
@@ -337,7 +319,6 @@ const DEFAULT_SCHOOL_SETTINGS = {
   email: "min.mlangen@gmail.com",
   logo_base64: ""
 };
-
 const DEFAULT_DOCUMENT_SETTINGS = {
   kop_image: DEFAULT_KOP_IMAGE_SRC,
   use_kop_pdf: true,
@@ -354,7 +335,6 @@ const DEFAULT_DOCUMENT_SETTINGS = {
   show_page_number: true,
   show_print_date: true
 };
-
 const DEFAULT_GRADING_FORMULA = {
   pg_kompleks_mode: "PROPORTIONAL",
   isian_mode: "CASE_INSENSITIVE",
@@ -362,7 +342,6 @@ const DEFAULT_GRADING_FORMULA = {
   max_score: 100,
   kkm: 75
 };
-
 const SQL_SCHEMA_SCRIPT = `-- Jalankan di SQL Editor Supabase
 create extension if not exists "pgcrypto";
 create table if not exists public.school_settings (id text primary key, data jsonb not null default '{}'::jsonb, updated_at timestamptz not null default now());
@@ -371,8 +350,8 @@ create table if not exists public.classes (id uuid primary key default gen_rando
 create table if not exists public.subjects (id uuid primary key default gen_random_uuid(), code text not null, name text not null, is_simulation boolean not null default false, created_at timestamptz not null default now());
 create table if not exists public.teachers (id uuid primary key default gen_random_uuid(), full_name text not null, nip text, username text not null, subject_id uuid references public.subjects(id) on delete set null, is_active boolean not null default true, is_simulation boolean not null default false, created_at timestamptz not null default now());
 create table if not exists public.students (id uuid primary key default gen_random_uuid(), nis text, nisn text, full_name text not null, class_id uuid references public.classes(id) on delete restrict, username text not null, password text, is_active boolean not null default true, is_simulation boolean not null default false, created_at timestamptz not null default now());
-create table if not exists public.questions (id uuid primary key default gen_random_uuid(), subject_id uuid references public.subjects(id) on delete set null, topic text, type text not null, question_text text not null, options jsonb not null default '[]'::jsonb, correct_answer text not null, weight numeric not null default 1, is_verified boolean not null default true, is_simulation boolean not null default false, created_at timestamptz not null default now());
-create table if not exists public.exams (id uuid primary key default gen_random_uuid(), title text not null, subject_id uuid references public.subjects(id) on delete set null, class_id text, exam_date text, start_time text, end_time text, duration_minutes integer not null default 60, instructions text, question_ids jsonb not null default '[]'::jsonb, status text not null default 'AKTIF', show_result_to_student boolean not null default true, is_simulation boolean not null default false, created_at timestamptz not null default now());
+create table if not exists public.questions (id uuid primary key default gen_random_uuid(), created_by uuid references auth.users(id), subject_id uuid references public.subjects(id) on delete set null, topic text, type text not null, question_text text not null, options jsonb not null default '[]'::jsonb, correct_answer text not null, weight numeric not null default 1, is_verified boolean not null default true, is_simulation boolean not null default false, created_at timestamptz not null default now());
+create table if not exists public.exams (id uuid primary key default gen_random_uuid(), created_by uuid references auth.users(id), title text not null, subject_id uuid references public.subjects(id) on delete set null, class_id text, exam_date text, start_time text, end_time text, duration_minutes integer not null default 60, instructions text, question_ids jsonb not null default '[]'::jsonb, status text not null default 'AKTIF', show_result_to_student boolean not null default true, is_simulation boolean not null default false, created_at timestamptz not null default now());
 create table if not exists public.exam_participants (id uuid primary key default gen_random_uuid(), exam_id uuid references public.exams(id) on delete cascade, student_id uuid, student_name text not null, nis text, nisn text, class_id uuid, is_eligible boolean not null default true, is_simulation boolean not null default false, created_at timestamptz not null default now());
 create table if not exists public.exam_attempts (id uuid primary key default gen_random_uuid(), exam_id uuid references public.exams(id) on delete cascade, student_id text not null, student_name text not null, answers jsonb not null default '{}'::jsonb, status text not null default 'SELESAI', is_simulation boolean not null default false, submitted_at timestamptz not null default now());
 create table if not exists public.student_answers (id text primary key, exam_id uuid references public.exams(id) on delete cascade, student_id text not null, question_id uuid references public.questions(id) on delete cascade, answer text, is_simulation boolean not null default false, updated_at timestamptz not null default now());
@@ -518,7 +497,6 @@ const buildOfficialDocumentHtml = ({
           </tbody>
         </table>`
       : "";
-
   const signatureHtml = includeSignature
     ? `<div class="signature-grid">
         <div></div>
@@ -531,7 +509,6 @@ const buildOfficialDocumentHtml = ({
         </div>
       </div>`
     : "";
-
   return `<!DOCTYPE html>
 <html lang="id">
 <head>
@@ -750,7 +727,6 @@ const exportOfficialExcelWithKop = async ({
   });
   const colCount = Math.max(columns.length, 4);
   ws.columns = columns.map((c) => ({ header: "", key: c.key, width: c.width || 18 }));
-
   let currentRow = 1;
   if (cfg.use_kop_excel) {
     const base64Img = await fetchImageAsBase64(cfg.kop_image || DEFAULT_KOP_IMAGE_SRC);
@@ -767,7 +743,6 @@ const exportOfficialExcelWithKop = async ({
       currentRow = 7;
     }
   }
-
   if (isSimulation) {
     ws.mergeCells(currentRow, 1, currentRow, colCount);
     const simCell = ws.getCell(currentRow, 1);
@@ -776,14 +751,12 @@ const exportOfficialExcelWithKop = async ({
     simCell.alignment = { horizontal: "center" };
     currentRow++;
   }
-
   ws.mergeCells(currentRow, 1, currentRow, colCount);
   const titleCell = ws.getCell(currentRow, 1);
   titleCell.value = title;
   titleCell.font = { bold: true, size: 13 };
   titleCell.alignment = { horizontal: "center" };
   currentRow++;
-
   if (subtitle) {
     ws.mergeCells(currentRow, 1, currentRow, colCount);
     const subCell = ws.getCell(currentRow, 1);
@@ -792,7 +765,6 @@ const exportOfficialExcelWithKop = async ({
     subCell.alignment = { horizontal: "center" };
     currentRow++;
   }
-
   currentRow++;
   const headerRowIndex = currentRow;
   const headerRow = ws.getRow(headerRowIndex);
@@ -812,7 +784,6 @@ const exportOfficialExcelWithKop = async ({
   headerRow.height = 24;
   ws.pageSetup.printTitlesRow = `${headerRowIndex}:${headerRowIndex}`;
   currentRow++;
-
   rows.forEach((rowObj) => {
     const r = ws.getRow(currentRow);
     columns.forEach((col, i) => {
@@ -828,7 +799,6 @@ const exportOfficialExcelWithKop = async ({
     });
     currentRow++;
   });
-
   const buffer = await workbook.xlsx.writeBuffer();
   const blob = new Blob([buffer], {
     type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
@@ -971,7 +941,6 @@ function CbtMin4MagelangApp() {
     () => localStorage.getItem("cbt_min4_sb_key") || DEFAULT_SUPABASE_ANON_KEY
   );
   const [showSchemaModal, setShowSchemaModal] = useState(false);
-
   const supabase = useMemo(() => {
     if (!supabaseUrl || !supabaseKey) return null;
     try {
@@ -982,7 +951,6 @@ function CbtMin4MagelangApp() {
       return null;
     }
   }, [supabaseUrl, supabaseKey]);
-
   const [currentUser, setCurrentUser] = useState(null);
   const [isSimulationMode, setIsSimulationMode] = useState(false);
   const [hasProductionAdmin, setHasProductionAdmin] = useState(true);
@@ -992,20 +960,16 @@ function CbtMin4MagelangApp() {
   const [loginPassword, setLoginPassword] = useState("");
   const [failedAttempts, setFailedAttempts] = useState(0);
   const [lockoutUntil, setLockoutUntil] = useState(0);
-
   const [setupName, setSetupName] = useState("");
   const [setupUsername, setSetupUsername] = useState("");
   const [setupEmail, setSetupEmail] = useState("");
   const [setupPassword, setSetupPassword] = useState("");
-
   const [activeMenu, setActiveMenu] = useState("dashboard");
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [banner, setBanner] = useState(null);
-
   const [schoolSettings, setSchoolSettings] = useState(DEFAULT_SCHOOL_SETTINGS);
   const [documentSettings, setDocumentSettings] = useState(DEFAULT_DOCUMENT_SETTINGS);
   const [gradingFormula, setGradingFormula] = useState(DEFAULT_GRADING_FORMULA);
-
   const [profilesList, setProfilesList] = useState([]);
   const [classesList, setClassesList] = useState([]);
   const [subjects, setSubjects] = useState([]);
@@ -1087,6 +1051,23 @@ function CbtMin4MagelangApp() {
       }
       if (!currentUser) return;
       const simFlag = Boolean(isSimulationMode);
+      const isGuruUser = currentUser.role === "GURU";
+      const qBuilder = supabase
+        .from("questions")
+        .select("*")
+        .eq("is_simulation", simFlag)
+        .order("created_at", { ascending: false });
+      const exBuilder = supabase
+        .from("exams")
+        .select("*")
+        .eq("is_simulation", simFlag)
+        .order("created_at", { ascending: false });
+
+      if (isGuruUser && currentUser.id) {
+        qBuilder.eq("created_by", currentUser.id);
+        exBuilder.eq("created_by", currentUser.id);
+      }
+
       const [
         profRes,
         clsRes,
@@ -1105,16 +1086,8 @@ function CbtMin4MagelangApp() {
         supabase.from("subjects").select("*").eq("is_simulation", simFlag).order("name"),
         supabase.from("teachers").select("*").eq("is_simulation", simFlag).order("full_name"),
         supabase.from("students").select("*").eq("is_simulation", simFlag).order("full_name"),
-        supabase
-          .from("questions")
-          .select("*")
-          .eq("is_simulation", simFlag)
-          .order("created_at", { ascending: false }),
-        supabase
-          .from("exams")
-          .select("*")
-          .eq("is_simulation", simFlag)
-          .order("created_at", { ascending: false }),
+        qBuilder,
+        exBuilder,
         supabase.from("exam_participants").select("*").eq("is_simulation", simFlag),
         supabase.from("exam_attempts").select("*").eq("is_simulation", simFlag),
         supabase.from("student_answers").select("*").eq("is_simulation", simFlag),
@@ -1132,11 +1105,32 @@ function CbtMin4MagelangApp() {
           setQuestions(qRes.data);
         }
       }
-      if (exRes.data) setExams(exRes.data);
-      if (partRes.data) setParticipants(partRes.data);
-      if (attRes.data) setAttempts(attRes.data);
-      if (ansRes.data) setStudentAnswers(ansRes.data);
-      if (resRes.data) setExamResults(resRes.data);
+      const loadedExams = Array.isArray(exRes.data) ? exRes.data : [];
+      setExams(loadedExams);
+
+      const guruExamIds = new Set(loadedExams.map((e) => e.id));
+      if (partRes.data) {
+        setParticipants(
+          isGuruUser
+            ? partRes.data.filter((p) => guruExamIds.has(p.exam_id))
+            : partRes.data
+        );
+      }
+      if (attRes.data) {
+        setAttempts(
+          isGuruUser ? attRes.data.filter((a) => guruExamIds.has(a.exam_id)) : attRes.data
+        );
+      }
+      if (ansRes.data) {
+        setStudentAnswers(
+          isGuruUser ? ansRes.data.filter((a) => guruExamIds.has(a.exam_id)) : ansRes.data
+        );
+      }
+      if (resRes.data) {
+        setExamResults(
+          isGuruUser ? resRes.data.filter((r) => guruExamIds.has(r.exam_id)) : resRes.data
+        );
+      }
     } catch (err) {
       console.error("Refresh data error:", err);
     }
@@ -1257,7 +1251,6 @@ function CbtMin4MagelangApp() {
         showBanner("success", `Selamat datang, ${matchedStudent.full_name} (SISWA).`);
         return;
       }
-
       let targetEmail = rawId;
       if (!rawId.includes("@")) {
         const { data: foundProf } = await supabase
@@ -1634,6 +1627,7 @@ function CbtMin4MagelangApp() {
         return (
           <QuestionBankManagerView
             supabase={supabase}
+            currentUser={currentUser}
             questions={questions}
             subjects={subjects}
             schoolSettings={schoolSettings}
@@ -1647,6 +1641,7 @@ function CbtMin4MagelangApp() {
         return (
           <ExamsManagerView
             supabase={supabase}
+            currentUser={currentUser}
             exams={exams}
             subjects={subjects}
             classesList={classesList}
@@ -1948,7 +1943,6 @@ function DashboardView({ user, isSimulation, schoolSettings, stats, onNavigate }
     { label: "Jadwal Ujian", value: stats.exams, menu: "exams", roles: ["ADMIN", "GURU"] },
     { label: "Hasil Ujian", value: stats.results, menu: "results", roles: ["ADMIN", "GURU"] }
   ].filter((c) => c.roles.includes(user.role));
-
   return (
     <div className="space-y-5">
       <div className="bg-white border border-slate-200 rounded-2xl p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -2026,7 +2020,6 @@ function SchoolIdentityView({ supabase, schoolSettings, onSaved, showBanner }) {
   useEffect(() => {
     setForm(schoolSettings);
   }, [schoolSettings]);
-
   const handleLogoUpload = (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -2039,7 +2032,6 @@ function SchoolIdentityView({ supabase, schoolSettings, onSaved, showBanner }) {
     };
     reader.readAsDataURL(file);
   };
-
   const handleSave = async (e) => {
     e.preventDefault();
     if (!supabase) return showBanner("error", "Supabase belum terhubung.");
@@ -2056,7 +2048,6 @@ function SchoolIdentityView({ supabase, schoolSettings, onSaved, showBanner }) {
       showBanner("error", `Gagal menyimpan identitas: ${err.message}`);
     }
   };
-
   return (
     <form
       onSubmit={handleSave}
@@ -2188,7 +2179,6 @@ function ClassesManagerView({ supabase, classesList, students, isSimulation, onR
   const [grade, setGrade] = useState("1");
   const [search, setSearch] = useState("");
   const [importSummary, setImportSummary] = useState(null);
-
   const filtered = useMemo(
     () =>
       classesList.filter(
@@ -2198,7 +2188,6 @@ function ClassesManagerView({ supabase, classesList, students, isSimulation, onR
       ),
     [classesList, search]
   );
-
   const handleDownloadTemplate = async () => {
     await downloadXlsxTemplateFile("Template_Data_Kelas_MIN4.xlsx", "Data_Kelas", [
       { name: "1A", grade_level: "1" },
@@ -2206,7 +2195,6 @@ function ClassesManagerView({ supabase, classesList, students, isSimulation, onR
     ]);
     showBanner("success", "Template Data Kelas (.xlsx) berhasil diunduh.");
   };
-
   const handleImportFile = async (e) => {
     const file = e.target.files?.[0];
     e.target.value = "";
@@ -2256,7 +2244,6 @@ function ClassesManagerView({ supabase, classesList, students, isSimulation, onR
       showBanner("error", `Gagal mengimpor Data Kelas: ${err.message}`);
     }
   };
-
   const handleAdd = async (e) => {
     e.preventDefault();
     if (!supabase || !name.trim()) return;
@@ -2270,7 +2257,6 @@ function ClassesManagerView({ supabase, classesList, students, isSimulation, onR
     await onRefresh();
     showBanner("success", "Kelas berhasil ditambahkan.");
   };
-
   const handleDelete = async (cls) => {
     const hasStudents = students.some((s) => s.class_id === cls.id);
     if (hasStudents) {
@@ -2281,7 +2267,6 @@ function ClassesManagerView({ supabase, classesList, students, isSimulation, onR
     await onRefresh();
     showBanner("success", "Kelas dihapus.");
   };
-
   return (
     <div className="space-y-4">
       <form
@@ -2321,7 +2306,6 @@ function ClassesManagerView({ supabase, classesList, students, isSimulation, onR
           Tambah Kelas
         </button>
       </form>
-
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-2 bg-white border border-slate-200 rounded-xl px-3 py-2 max-w-sm flex-1">
           <Search className="w-4 h-4 text-slate-400" />
@@ -2354,7 +2338,6 @@ function ClassesManagerView({ supabase, classesList, students, isSimulation, onR
           </label>
         </div>
       </div>
-
       {importSummary && (
         <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3 text-xs space-y-1">
           <div className="font-extrabold text-emerald-900">
@@ -2370,7 +2353,6 @@ function ClassesManagerView({ supabase, classesList, students, isSimulation, onR
           )}
         </div>
       )}
-
       <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
         <table className="w-full text-xs">
           <thead className="bg-slate-50 border-b border-slate-200 text-slate-700 font-bold">
@@ -2422,7 +2404,6 @@ function SubjectsManagerView({ supabase, subjects, isSimulation, onRefresh, show
   const [name, setName] = useState("");
   const [search, setSearch] = useState("");
   const [importSummary, setImportSummary] = useState(null);
-
   const filtered = useMemo(
     () =>
       subjects.filter(
@@ -2432,7 +2413,6 @@ function SubjectsManagerView({ supabase, subjects, isSimulation, onRefresh, show
       ),
     [subjects, search]
   );
-
   const handleDownloadTemplate = async () => {
     await downloadXlsxTemplateFile("Template_Mata_Pelajaran_MIN4.xlsx", "Mata_Pelajaran", [
       { code: "MTK", name: "Matematika" },
@@ -2440,7 +2420,6 @@ function SubjectsManagerView({ supabase, subjects, isSimulation, onRefresh, show
     ]);
     showBanner("success", "Template Mata Pelajaran (.xlsx) berhasil diunduh.");
   };
-
   const handleImportFile = async (e) => {
     const file = e.target.files?.[0];
     e.target.value = "";
@@ -2490,7 +2469,6 @@ function SubjectsManagerView({ supabase, subjects, isSimulation, onRefresh, show
       showBanner("error", `Gagal mengimpor Mata Pelajaran: ${err.message}`);
     }
   };
-
   const handleAdd = async (e) => {
     e.preventDefault();
     if (!supabase || !code.trim() || !name.trim()) return;
@@ -2509,14 +2487,12 @@ function SubjectsManagerView({ supabase, subjects, isSimulation, onRefresh, show
     await onRefresh();
     showBanner("success", "Mata pelajaran berhasil ditambahkan.");
   };
-
   const handleDelete = async (id) => {
     const { error } = await supabase.from("subjects").delete().eq("id", id);
     if (error) return showBanner("error", error.message);
     await onRefresh();
     showBanner("success", "Mata pelajaran dihapus.");
   };
-
   return (
     <div className="space-y-4">
       <form
@@ -2553,7 +2529,6 @@ function SubjectsManagerView({ supabase, subjects, isSimulation, onRefresh, show
           Tambah Mapel
         </button>
       </form>
-
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-2 bg-white border border-slate-200 rounded-xl px-3 py-2 max-w-sm flex-1">
           <Search className="w-4 h-4 text-slate-400" />
@@ -2586,7 +2561,6 @@ function SubjectsManagerView({ supabase, subjects, isSimulation, onRefresh, show
           </label>
         </div>
       </div>
-
       {importSummary && (
         <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3 text-xs space-y-1">
           <div className="font-extrabold text-emerald-900">
@@ -2602,7 +2576,6 @@ function SubjectsManagerView({ supabase, subjects, isSimulation, onRefresh, show
           )}
         </div>
       )}
-
       <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
         <table className="w-full text-xs">
           <thead className="bg-slate-50 border-b border-slate-200 text-slate-700 font-bold">
@@ -2650,7 +2623,6 @@ function TeachersManagerView({ supabase, teachers, subjects, isSimulation, onRef
   const [subjectId, setSubjectId] = useState("");
   const [search, setSearch] = useState("");
   const [importSummary, setImportSummary] = useState(null);
-
   const filtered = useMemo(
     () =>
       teachers.filter(
@@ -2661,7 +2633,6 @@ function TeachersManagerView({ supabase, teachers, subjects, isSimulation, onRef
       ),
     [teachers, search]
   );
-
   const handleDownloadTemplate = async () => {
     const sampleSubject = subjects[0]?.name || "Matematika";
     await downloadXlsxTemplateFile("Template_Data_Guru_MIN4.xlsx", "Data_Guru", [
@@ -2675,7 +2646,6 @@ function TeachersManagerView({ supabase, teachers, subjects, isSimulation, onRef
     ]);
     showBanner("success", "Template Data Guru (.xlsx) berhasil diunduh.");
   };
-
   const handleImportFile = async (e) => {
     const file = e.target.files?.[0];
     e.target.value = "";
@@ -2750,7 +2720,6 @@ function TeachersManagerView({ supabase, teachers, subjects, isSimulation, onRef
       showBanner("error", `Gagal mengimpor Data Guru: ${err.message}`);
     }
   };
-
   const handleAdd = async (e) => {
     e.preventDefault();
     if (!supabase || !fullName.trim() || !username.trim()) return;
@@ -2771,14 +2740,12 @@ function TeachersManagerView({ supabase, teachers, subjects, isSimulation, onRef
     await onRefresh();
     showBanner("success", "Data guru berhasil disimpan.");
   };
-
   const handleDelete = async (id) => {
     const { error } = await supabase.from("teachers").delete().eq("id", id);
     if (error) return showBanner("error", error.message);
     await onRefresh();
     showBanner("success", "Data guru dihapus.");
   };
-
   return (
     <div className="space-y-4">
       <form
@@ -2837,7 +2804,6 @@ function TeachersManagerView({ supabase, teachers, subjects, isSimulation, onRef
           Simpan Guru
         </button>
       </form>
-
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-2 bg-white border border-slate-200 rounded-xl px-3 py-2 max-w-sm flex-1">
           <Search className="w-4 h-4 text-slate-400" />
@@ -2870,7 +2836,6 @@ function TeachersManagerView({ supabase, teachers, subjects, isSimulation, onRef
           </label>
         </div>
       </div>
-
       {importSummary && (
         <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3 text-xs space-y-1">
           <div className="font-extrabold text-emerald-900">
@@ -2886,7 +2851,6 @@ function TeachersManagerView({ supabase, teachers, subjects, isSimulation, onRef
           )}
         </div>
       )}
-
       <div className="bg-white border border-slate-200 rounded-2xl overflow-x-auto">
         <table className="w-full text-xs">
           <thead className="bg-slate-50 border-b border-slate-200 text-slate-700 font-bold">
@@ -2945,7 +2909,6 @@ function StudentsManagerView({ supabase, students, classesList, isSimulation, on
   const [filterClass, setFilterClass] = useState("");
   const [importSummary, setImportSummary] = useState(null);
   const [lastCreatedCreds, setLastCreatedCreds] = useState(null);
-
   const filtered = useMemo(
     () =>
       students.filter((st) => {
@@ -2960,7 +2923,6 @@ function StudentsManagerView({ supabase, students, classesList, isSimulation, on
       }),
     [students, search, filterClass]
   );
-
   const handleDownloadTemplate = async () => {
     const sampleClass = classesList[0]?.name || "6A";
     await downloadXlsxTemplateFile("Template_Data_Siswa_MIN4.xlsx", "Data_Siswa", [
@@ -2976,7 +2938,6 @@ function StudentsManagerView({ supabase, students, classesList, isSimulation, on
     ]);
     showBanner("success", "Template Data Siswa (.xlsx) berhasil diunduh.");
   };
-
   const handleImportFile = async (e) => {
     const file = e.target.files?.[0];
     e.target.value = "";
@@ -3051,7 +3012,6 @@ function StudentsManagerView({ supabase, students, classesList, isSimulation, on
       showBanner("error", `Gagal mengimpor Data Siswa: ${err.message}`);
     }
   };
-
   const handleAdd = async (e) => {
     e.preventDefault();
     if (!supabase || !fullName.trim() || !classId) {
@@ -3093,14 +3053,12 @@ function StudentsManagerView({ supabase, students, classesList, isSimulation, on
       `Data & kredensial login siswa "${payload.full_name}" berhasil disimpan.`
     );
   };
-
   const handleDelete = async (id) => {
     const { error } = await supabase.from("students").delete().eq("id", id);
     if (error) return showBanner("error", error.message);
     await onRefresh();
     showBanner("success", "Data siswa dihapus.");
   };
-
   return (
     <div className="space-y-4">
       <form
@@ -3182,7 +3140,6 @@ function StudentsManagerView({ supabase, students, classesList, isSimulation, on
           </div>
         </div>
       </form>
-
       {lastCreatedCreds && (
         <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3 text-xs flex flex-wrap items-center justify-between gap-2">
           <div>
@@ -3201,7 +3158,6 @@ function StudentsManagerView({ supabase, students, classesList, isSimulation, on
           </button>
         </div>
       )}
-
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-wrap items-center gap-3">
           <div className="flex items-center gap-2 bg-white border border-slate-200 rounded-xl px-3 py-2 min-w-[220px]">
@@ -3248,7 +3204,6 @@ function StudentsManagerView({ supabase, students, classesList, isSimulation, on
           </label>
         </div>
       </div>
-
       {importSummary && (
         <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3 text-xs space-y-1">
           <div className="font-extrabold text-emerald-900">
@@ -3264,7 +3219,6 @@ function StudentsManagerView({ supabase, students, classesList, isSimulation, on
           )}
         </div>
       )}
-
       <div className="bg-white border border-slate-200 rounded-2xl overflow-x-auto">
         <table className="w-full text-xs">
           <thead className="bg-slate-50 border-b border-slate-200 text-slate-700 font-bold">
@@ -3346,6 +3300,7 @@ function buildOptionsByType(qType, optA, optB, optC, optD, optE = "") {
 
 function QuestionBankManagerView({
   supabase,
+  currentUser,
   questions,
   subjects,
   schoolSettings,
@@ -3365,7 +3320,6 @@ function QuestionBankManagerView({
   const [optE, setOptE] = useState("");
   const [correctAnswer, setCorrectAnswer] = useState("A");
   const [weight, setWeight] = useState(1);
-
   const [editingQuestion, setEditingQuestion] = useState(null);
   const [editSubjectId, setEditSubjectId] = useState("");
   const [editTopic, setEditTopic] = useState("");
@@ -3379,7 +3333,6 @@ function QuestionBankManagerView({
   const [editCorrectAnswer, setEditCorrectAnswer] = useState("");
   const [editWeight, setEditWeight] = useState(1);
   const [savingEdit, setSavingEdit] = useState(false);
-
   const [search, setSearch] = useState("");
   const [filterSubject, setFilterSubject] = useState("");
   const [importSummary, setImportSummary] = useState(null);
@@ -3559,6 +3512,7 @@ function QuestionBankManagerView({
           optionsJson = buildOptionsByType(rawType, "", "", "", "", "");
         }
         validPayloads.push({
+          created_by: currentUser?.id || null,
           subject_id: matchedSubjectId,
           topic: qTopic,
           type: rawType,
@@ -3598,6 +3552,7 @@ function QuestionBankManagerView({
     const options = buildOptionsByType(qType, optA, optB, optC, optD, optE);
     const { error } = await supabase.from("questions").insert([
       {
+        created_by: currentUser?.id || null,
         subject_id: subjectId || null,
         topic: topic.trim(),
         type: qType,
@@ -3712,7 +3667,6 @@ function QuestionBankManagerView({
             </button>
           </div>
         </div>
-
         {importSummary && (
           <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3 text-xs space-y-1">
             <div className="font-extrabold text-emerald-900">
@@ -3728,7 +3682,6 @@ function QuestionBankManagerView({
             )}
           </div>
         )}
-
         <form onSubmit={handleSaveQuestion} className="space-y-3">
           <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
             <div>
@@ -3781,7 +3734,6 @@ function QuestionBankManagerView({
               />
             </div>
           </div>
-
           <div>
             <label className="block text-xs font-bold text-slate-700 mb-1">Pertanyaan Soal</label>
             <textarea
@@ -3792,7 +3744,6 @@ function QuestionBankManagerView({
               className="w-full border border-slate-300 rounded-xl px-3 py-2 text-xs"
             />
           </div>
-
           {(qType === "PG" || qType === "PG_KOMPLEKS") && (
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
               <input
@@ -3832,7 +3783,6 @@ function QuestionBankManagerView({
               />
             </div>
           )}
-
           <div className="flex flex-wrap items-end gap-3">
             <div className="flex-1 min-w-[200px]">
               <label className="block text-xs font-bold text-slate-700 mb-1">
@@ -3855,7 +3805,6 @@ function QuestionBankManagerView({
           </div>
         </form>
       </div>
-
       <div className="flex flex-wrap gap-3">
         <div className="flex items-center gap-2 bg-white border border-slate-200 rounded-xl px-3 py-2 flex-1 min-w-[200px]">
           <Search className="w-4 h-4 text-slate-400" />
@@ -3880,11 +3829,10 @@ function QuestionBankManagerView({
           ))}
         </select>
       </div>
-
       <div className="space-y-2">
         {filteredQuestions.length === 0 ? (
           <div className="bg-white border border-slate-200 rounded-2xl p-6 text-center text-xs text-slate-500">
-            Belum ada butir soal pada database.
+            Belum ada butir soal pada bank soal akun ini.
           </div>
         ) : (
           filteredQuestions.map((q, idx) => {
@@ -3943,7 +3891,6 @@ function QuestionBankManagerView({
           })
         )}
       </div>
-
       {editingQuestion && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50 overflow-y-auto">
           <div className="bg-white rounded-2xl max-w-2xl w-full p-5 space-y-4 shadow-lg my-auto">
@@ -4156,6 +4103,7 @@ function QuestionBankManagerView({
 // ============================================================================
 function ExamsManagerView({
   supabase,
+  currentUser,
   exams,
   subjects,
   classesList,
@@ -4178,24 +4126,20 @@ function ExamsManagerView({
     "Berdoalah sebelum mengerjakan ujian. Pilihlah jawaban yang paling tepat."
   );
   const [selectedQuestionIds, setSelectedQuestionIds] = useState([]);
-
   const availableQuestions = useMemo(
     () => questions.filter((q) => !subjectId || q.subject_id === subjectId),
     [questions, subjectId]
   );
-
   const allQuestionIds = useMemo(
     () => availableQuestions.map((q) => q.id),
     [availableQuestions]
   );
-
   const isAllSelected = useMemo(
     () =>
       allQuestionIds.length > 0 &&
       allQuestionIds.every((id) => selectedQuestionIds.includes(id)),
     [allQuestionIds, selectedQuestionIds]
   );
-
   const handleToggleSelectAllQuestions = () => {
     if (isAllSelected) {
       setSelectedQuestionIds((prev) => prev.filter((id) => !allQuestionIds.includes(id)));
@@ -4203,19 +4147,16 @@ function ExamsManagerView({
       setSelectedQuestionIds((prev) => Array.from(new Set([...prev, ...allQuestionIds])));
     }
   };
-
   const toggleQuestionSelect = (id) => {
     setSelectedQuestionIds((prev) =>
       prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]
     );
   };
-
   const toggleClassSelect = (id) => {
     setSelectedClassIds((prev) =>
       prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]
     );
   };
-
   const handleToggleAllClasses = () => {
     if (selectedClassIds.length === classesList.length) {
       setSelectedClassIds([]);
@@ -4223,7 +4164,6 @@ function ExamsManagerView({
       setSelectedClassIds(classesList.map((c) => c.id));
     }
   };
-
   const handleCreateExam = async (e) => {
     e.preventDefault();
     if (!supabase) return;
@@ -4236,6 +4176,7 @@ function ExamsManagerView({
         : selectedClassIds.join(",");
     const { error } = await supabase.from("exams").insert([
       {
+        created_by: currentUser?.id || null,
         title: title.trim(),
         subject_id: subjectId || null,
         class_id: classIdValue,
@@ -4257,7 +4198,6 @@ function ExamsManagerView({
     await onRefresh();
     showBanner("success", "Paket jadwal ujian berhasil dibuat.");
   };
-
   const handlePrintNaskahSoal = (exam) => {
     const qIds = Array.isArray(exam.question_ids) ? exam.question_ids : [];
     const examQuestions = qIds
@@ -4278,7 +4218,6 @@ function ExamsManagerView({
             .map((id) => classesList.find((c) => c.id === id)?.name)
             .filter(Boolean)
             .join(", ") || "-";
-
     const bodyHtml = `
       <div style="border:1px solid #1f2937; padding:8px 10px; margin-bottom:10px; font-size:10pt;">
         <strong>PETUNJUK PENGERJAAN:</strong><br/>
@@ -4301,7 +4240,6 @@ function ExamsManagerView({
           .join("")}
       </ol>
     `;
-
     const html = buildOfficialDocumentHtml({
       title: `NASKAH SOAL ${exam.title}`,
       subtitle: `${schoolSettings.school_name} • Tahun Pelajaran ${schoolSettings.academic_year}`,
@@ -4324,7 +4262,6 @@ function ExamsManagerView({
     });
     openPrintDocumentWindow(html);
   };
-
   return (
     <div className="space-y-4">
       <form
@@ -4475,7 +4412,7 @@ function ExamsManagerView({
           <div className="max-h-44 overflow-y-auto border border-slate-200 rounded-xl p-2 space-y-1 bg-slate-50">
             {availableQuestions.length === 0 ? (
               <div className="text-xs text-slate-500 p-2">
-                Belum ada soal pada mata pelajaran ini.
+                Belum ada soal pada bank soal akun ini.
               </div>
             ) : (
               availableQuestions.map((q) => (
@@ -4502,7 +4439,6 @@ function ExamsManagerView({
           Simpan & Terbitkan Jadwal Ujian
         </button>
       </form>
-
       <div className="bg-white border border-slate-200 rounded-2xl overflow-x-auto">
         <table className="w-full text-xs">
           <thead className="bg-slate-50 border-b border-slate-200 font-bold text-slate-700">
@@ -4518,7 +4454,7 @@ function ExamsManagerView({
             {exams.length === 0 ? (
               <tr>
                 <td colSpan={5} className="p-6 text-center text-slate-500">
-                  Belum ada jadwal ujian.
+                  Belum ada jadwal ujian pada akun ini.
                 </td>
               </tr>
             ) : (
@@ -4576,19 +4512,16 @@ function ParticipantsManagerView({
   const [selectedExamId, setSelectedExamId] = useState("");
   const [selectedClassIds, setSelectedClassIds] = useState([]);
   const [filterClassIds, setFilterClassIds] = useState([]);
-
   const toggleAssignClass = (id) => {
     setSelectedClassIds((prev) =>
       prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]
     );
   };
-
   const toggleFilterClass = (id) => {
     setFilterClassIds((prev) =>
       prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]
     );
   };
-
   const combinedParticipants = useMemo(() => {
     if (!selectedExamId) return [];
     const byStudentKey = new Map();
@@ -4601,7 +4534,6 @@ function ParticipantsManagerView({
             (s.full_name || "").trim().toLowerCase() === String(stName).trim().toLowerCase())
       );
     };
-
     participants
       .filter((p) => p.exam_id === selectedExamId)
       .forEach((p) => {
@@ -4634,7 +4566,6 @@ function ParticipantsManagerView({
               : "Terdaftar"
         });
       });
-
     examResults
       .filter((r) => r.exam_id === selectedExamId)
       .forEach((r) => {
@@ -4652,7 +4583,6 @@ function ParticipantsManagerView({
           });
         }
       });
-
     attempts
       .filter((a) => a.exam_id === selectedExamId)
       .forEach((a) => {
@@ -4677,17 +4607,14 @@ function ParticipantsManagerView({
           });
         }
       });
-
     return Array.from(byStudentKey.values()).sort((a, b) =>
       (a.student_name || "").localeCompare(b.student_name || "", "id")
     );
   }, [selectedExamId, participants, attempts, examResults, students]);
-
   const filteredExamParticipants = useMemo(() => {
     if (filterClassIds.length === 0) return combinedParticipants;
     return combinedParticipants.filter((p) => filterClassIds.includes(p.class_id));
   }, [combinedParticipants, filterClassIds]);
-
   const handleAssignByClasses = async () => {
     if (!supabase || !selectedExamId || selectedClassIds.length === 0) {
       return showBanner("error", "Pilih paket ujian dan minimal satu kelas terlebih dahulu.");
@@ -4719,7 +4646,6 @@ function ParticipantsManagerView({
     await onRefresh();
     showBanner("success", `${payloads.length} peserta berhasil ditambahkan ke ujian.`);
   };
-
   const handlePrintDaftarPeserta = () => {
     const exam = exams.find((e) => e.id === selectedExamId);
     if (!exam || filteredExamParticipants.length === 0) {
@@ -4733,7 +4659,6 @@ function ParticipantsManagerView({
             .filter(Boolean)
             .join(", ")
         : "Semua Kelas Peserta";
-
     const bodyHtml = `
       <table class="data-table">
         <thead>
@@ -4761,7 +4686,6 @@ function ParticipantsManagerView({
         </tbody>
       </table>
     `;
-
     const html = buildOfficialDocumentHtml({
       title: "DAFTAR PESERTA & DAFTAR HADIR UJIAN",
       subtitle: `${exam.title} (${selectedClassNames})`,
@@ -4779,7 +4703,6 @@ function ParticipantsManagerView({
     });
     openPrintDocumentWindow(html);
   };
-
   const handleExportParticipantsExcel = async () => {
     const exam = exams.find((e) => e.id === selectedExamId);
     if (!exam || filteredExamParticipants.length === 0) {
@@ -4810,7 +4733,6 @@ function ParticipantsManagerView({
       isSimulation
     });
   };
-
   return (
     <div className="space-y-4">
       <div className="bg-white border border-slate-200 rounded-2xl p-4 space-y-3 text-xs">
@@ -4872,7 +4794,6 @@ function ParticipantsManagerView({
           </button>
         </div>
       </div>
-
       {selectedExamId && (
         <div className="bg-white border border-slate-200 rounded-2xl p-4 space-y-3">
           <div className="flex flex-wrap items-center justify-between gap-3">
@@ -4928,7 +4849,6 @@ function ParticipantsManagerView({
           </div>
         </div>
       )}
-
       <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
         <table className="w-full text-xs">
           <thead className="bg-slate-50 border-b border-slate-200 font-bold text-slate-700">
@@ -5461,7 +5381,6 @@ function ResultsAndGradingView({
 }) {
   const [selectedExamId, setSelectedExamId] = useState("");
   const [formulaForm, setFormulaForm] = useState(gradingFormula);
-
   const filteredResults = useMemo(
     () =>
       selectedExamId
@@ -5469,7 +5388,6 @@ function ResultsAndGradingView({
         : examResults,
     [examResults, selectedExamId]
   );
-
   const handleRecalculateExam = async () => {
     if (!supabase || !selectedExamId) {
       return showBanner("error", "Pilih paket ujian yang akan dihitung ulang.");
@@ -5520,7 +5438,6 @@ function ResultsAndGradingView({
     await onRefresh();
     showBanner("success", "Perhitungan ulang nilai selesai berdasarkan kunci & rumus terbaru.");
   };
-
   return (
     <div className="space-y-4">
       <div className="bg-white border border-slate-200 rounded-2xl p-4 grid grid-cols-1 sm:grid-cols-4 gap-3 items-end">
@@ -5563,7 +5480,6 @@ function ResultsAndGradingView({
           Simpan Rumus Nilai
         </button>
       </div>
-
       <div className="flex flex-wrap items-center justify-between gap-3">
         <select
           value={selectedExamId}
@@ -5588,7 +5504,6 @@ function ResultsAndGradingView({
           </button>
         )}
       </div>
-
       <div className="bg-white border border-slate-200 rounded-2xl overflow-x-auto">
         <table className="w-full text-xs">
           <thead className="bg-slate-50 border-b border-slate-200 font-bold text-slate-700">
@@ -5657,7 +5572,6 @@ function ItemAnalysisView({
   showBanner
 }) {
   const [selectedExamId, setSelectedExamId] = useState("");
-
   const analysisRows = useMemo(() => {
     if (!selectedExamId) return [];
     const exam = exams.find((e) => e.id === selectedExamId);
@@ -5673,7 +5587,6 @@ function ItemAnalysisView({
     const lowerIds = new Set(
       groupSize > 0 ? results.slice(totalParticipants - groupSize).map((r) => r.student_id) : []
     );
-
     return examQs.map((q, idx) => {
       let correct = 0;
       let wrong = 0;
@@ -5716,7 +5629,6 @@ function ItemAnalysisView({
               : dIndex >= 0.2
                 ? "Cukup"
                 : "Perlu Revisi";
-
       return {
         no: idx + 1,
         question_text: q.question_text,
@@ -5729,7 +5641,6 @@ function ItemAnalysisView({
       };
     });
   }, [selectedExamId, exams, questions, studentAnswers, examResults]);
-
   const handlePrintAnalysis = () => {
     const exam = exams.find((e) => e.id === selectedExamId);
     if (!exam || analysisRows.length === 0) {
@@ -5782,7 +5693,6 @@ function ItemAnalysisView({
     });
     openPrintDocumentWindow(html);
   };
-
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -5809,7 +5719,6 @@ function ItemAnalysisView({
           </button>
         )}
       </div>
-
       <div className="bg-white border border-slate-200 rounded-2xl overflow-x-auto">
         <table className="w-full text-xs">
           <thead className="bg-slate-50 border-b border-slate-200 font-bold text-slate-700">
@@ -5867,7 +5776,6 @@ function OfficialReportsView({
   showBanner
 }) {
   const [selectedExamId, setSelectedExamId] = useState("");
-
   const rows = useMemo(
     () =>
       (selectedExamId
@@ -5889,7 +5797,6 @@ function OfficialReportsView({
       }),
     [examResults, selectedExamId, students, classesList]
   );
-
   const stats = useMemo(() => {
     if (rows.length === 0) return { max: 0, min: 0, avg: 0 };
     const scores = rows.map((r) => r.nilai);
@@ -5899,7 +5806,6 @@ function OfficialReportsView({
       avg: Number((scores.reduce((a, b) => a + b, 0) / scores.length).toFixed(2))
     };
   }, [rows]);
-
   const buildReportHtml = () => {
     const exam = exams.find((e) => e.id === selectedExamId);
     const sub = exam ? subjects.find((s) => s.id === exam.subject_id) : null;
@@ -5953,17 +5859,14 @@ function OfficialReportsView({
       isSimulation
     });
   };
-
   const handlePrintPdf = () => {
     if (rows.length === 0) return showBanner("error", "Belum ada data nilai untuk dicetak.");
     openPrintDocumentWindow(buildReportHtml());
   };
-
   const handleDownloadWord = () => {
     if (rows.length === 0) return showBanner("error", "Belum ada data nilai untuk diunduh.");
     downloadWordDocFile("Laporan_Hasil_Ujian_MIN4.doc", buildReportHtml());
   };
-
   const handleDownloadExcel = async () => {
     if (rows.length === 0) return showBanner("error", "Belum ada data nilai untuk diunduh.");
     await exportOfficialExcelWithKop({
@@ -5986,7 +5889,6 @@ function OfficialReportsView({
       isSimulation
     });
   };
-
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -6029,22 +5931,20 @@ function OfficialReportsView({
           </button>
         </div>
       </div>
-
       <div className="grid grid-cols-3 gap-3">
         <div className="bg-white border border-slate-200 rounded-2xl p-3 text-center">
           <div className="text-[11px] text-slate-500 font-bold">Nilai Tertinggi</div>
-          <div className="text-lg font-extrabold text-emerald-700">{stats.max}</div>
+          <div className="text-lg font-extrabold text-emerald-800">{stats.max}</div>
         </div>
         <div className="bg-white border border-slate-200 rounded-2xl p-3 text-center">
           <div className="text-[11px] text-slate-500 font-bold">Nilai Terendah</div>
-          <div className="text-lg font-extrabold text-red-600">{stats.min}</div>
+          <div className="text-lg font-extrabold text-amber-700">{stats.min}</div>
         </div>
         <div className="bg-white border border-slate-200 rounded-2xl p-3 text-center">
-          <div className="text-[11px] text-slate-500 font-bold">Rata-Rata Kelas</div>
+          <div className="text-[11px] text-slate-500 font-bold">Rata-Rata Nilai</div>
           <div className="text-lg font-extrabold text-slate-900">{stats.avg}</div>
         </div>
       </div>
-
       <div className="bg-white border border-slate-200 rounded-2xl overflow-x-auto">
         <table className="w-full text-xs">
           <thead className="bg-slate-50 border-b border-slate-200 font-bold text-slate-700">
@@ -6053,25 +5953,29 @@ function OfficialReportsView({
               <th className="p-3 text-left">NISN</th>
               <th className="p-3 text-left">Nama Siswa</th>
               <th className="p-3 text-left">Kelas</th>
-              <th className="p-3 text-left">Ujian</th>
+              <th className="p-3 text-left">Paket Ujian</th>
+              <th className="p-3 text-center">Benar</th>
+              <th className="p-3 text-center">Salah</th>
               <th className="p-3 text-center">Nilai</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
             {rows.length === 0 ? (
               <tr>
-                <td colSpan={6} className="p-6 text-center text-slate-500">
-                  Belum ada data laporan nilai di database.
+                <td colSpan={8} className="p-6 text-center text-slate-500">
+                  Belum ada data laporan hasil ujian.
                 </td>
               </tr>
             ) : (
               rows.map((r) => (
-                <tr key={`${r.nisn}-${r.no}`}>
+                <tr key={`${r.no}_${r.nama}`}>
                   <td className="p-3 text-center">{r.no}</td>
                   <td className="p-3 font-mono">{r.nisn}</td>
                   <td className="p-3 font-bold">{r.nama}</td>
                   <td className="p-3">{r.kelas}</td>
                   <td className="p-3">{r.ujian}</td>
+                  <td className="p-3 text-center text-emerald-700 font-bold">{r.benar}</td>
+                  <td className="p-3 text-center text-red-600 font-bold">{r.salah}</td>
                   <td className="p-3 text-center font-extrabold">{r.nilai}</td>
                 </tr>
               ))
@@ -6084,100 +5988,139 @@ function OfficialReportsView({
 }
 
 // ============================================================================
-// MODUL 11: PENGATURAN DOKUMEN & KOP SURAT TERPUSAT
+// MODUL 11: PENGATURAN TEMPLATE DOKUMEN & KOP SURAT TERPUSAT
 // ============================================================================
 function DocumentSettingsView({
+  supabase,
   schoolSettings,
   documentSettings,
   onSaveDocumentSettings,
   showBanner
 }) {
-  const [cfg, setCfg] = useState({ ...DEFAULT_DOCUMENT_SETTINGS, ...documentSettings });
+  const [form, setForm] = useState({ ...DEFAULT_DOCUMENT_SETTINGS, ...documentSettings });
   useEffect(() => {
-    setCfg({ ...DEFAULT_DOCUMENT_SETTINGS, ...documentSettings });
+    setForm({ ...DEFAULT_DOCUMENT_SETTINGS, ...documentSettings });
   }, [documentSettings]);
-
-  const handleKopFile = (e) => {
+  const handleKopFileChange = (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    if (file.size > 1.5 * 1024 * 1024) {
+      return showBanner("error", "Ukuran gambar kop maksimal 1.5 MB.");
+    }
     const reader = new FileReader();
     reader.onloadend = () => {
-      setCfg((prev) => ({ ...prev, kop_image: reader.result }));
+      setForm((prev) => ({ ...prev, kop_image: reader.result }));
     };
     reader.readAsDataURL(file);
   };
-
-  const handleTestPreview = () => {
+  const handleResetKop = () => {
+    setForm((prev) => ({ ...prev, kop_image: DEFAULT_KOP_IMAGE_SRC }));
+  };
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    await onSaveDocumentSettings(form);
+    if (supabase) {
+      await supabase.from("school_settings").upsert({
+        id: "document_template",
+        data: form,
+        updated_at: new Date().toISOString()
+      });
+    }
+  };
+  const handlePreviewDoc = () => {
     const html = buildOfficialDocumentHtml({
-      title: "CONTOH DOKUMEN RESMI BERKOP",
-      subtitle: "Pratinjau Kop Surat, Margin, Header & Footer Terpusat",
+      title: "CONTOH PREVIEW DOKUMEN RESMI",
+      subtitle: "Pengujian Kop Surat, Margin, Header/Footer & Tanda Tangan",
       metaRows: [
         { label: "Madrasah", value: schoolSettings.school_name },
         { label: "Tahun Pelajaran", value: schoolSettings.academic_year }
       ],
-      bodyHtml: `<p style="font-size:10.5pt;">Dokumen ini menguji tampilan kop resmi, ukuran kertas (${cfg.paper_size}), orientasi (${cfg.orientation}), serta margin atas/bawah/kiri/kanan.</p>`,
+      bodyHtml: `<p style="font-size:10.5pt;">Dokumen ini menampilkan pratinjau penerapan kop surat resmi, ukuran kertas (${form.paper_size}), orientasi (${form.orientation}), serta margin yang telah dikonfigurasi.</p>`,
       schoolSettings,
-      documentSettings: cfg,
-      includeSignature: true
+      documentSettings: form,
+      isSimulation: false
     });
     openPrintDocumentWindow(html);
   };
-
   return (
-    <div className="bg-white border border-slate-200 rounded-2xl p-5 space-y-5 shadow-sm text-xs">
-      <h2 className="text-sm font-extrabold text-slate-900">
-        Pengaturan Template Dokumen & Kop Surat Terpusat
-      </h2>
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-        <div className="space-y-3">
-          <div>
-            <label className="block font-bold text-slate-700 mb-1">
-              Gambar Kop Surat Resmi (Default: /image_3fe900.png)
-            </label>
-            <input type="file" accept="image/*" onChange={handleKopFile} className="text-xs" />
-          </div>
-          <div className="border border-slate-200 rounded-xl p-3 bg-slate-50">
+    <form
+      onSubmit={handleSubmit}
+      className="bg-white border border-slate-200 rounded-2xl p-5 space-y-5 shadow-sm text-xs"
+    >
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div>
+          <h2 className="text-sm font-extrabold text-slate-900">
+            Pengaturan Template Dokumen & Kop Surat Terpusat
+          </h2>
+          <p className="text-[11px] text-slate-500">
+            Berlaku otomatis untuk seluruh cetakan PDF, Excel (.xlsx), Word (.doc), Naskah Soal,
+            Daftar Hadir, dan Analisis Soal.
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={handlePreviewDoc}
+          className="px-3.5 py-2 rounded-xl border border-emerald-700 text-emerald-800 bg-emerald-50 font-bold flex items-center gap-1.5"
+        >
+          <Printer className="w-4 h-4" />
+          Preview Cetak
+        </button>
+      </div>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+        <div className="space-y-3 border border-slate-200 rounded-2xl p-4">
+          <div className="font-extrabold text-slate-800">Gambar Kop Surat Resmi</div>
+          <div className="border border-dashed border-slate-300 rounded-xl p-3 bg-slate-50 text-center">
             <img
-              src={cfg.kop_image || DEFAULT_KOP_IMAGE_SRC}
-              alt="Preview Kop Surat"
-              className="w-full max-h-32 object-contain mx-auto"
+              src={form.kop_image || DEFAULT_KOP_IMAGE_SRC}
+              alt="Pratinjau Kop Surat"
+              className="max-h-32 mx-auto object-contain"
             />
           </div>
-          <div className="space-y-1.5">
+          <div className="flex flex-wrap gap-2">
+            <label className="cursor-pointer px-3 py-1.5 rounded-xl bg-emerald-700 text-white font-bold">
+              Ganti Gambar Kop
+              <input
+                type="file"
+                accept="image/png,image/jpeg,image/webp"
+                onChange={handleKopFileChange}
+                className="hidden"
+              />
+            </label>
+            <button
+              type="button"
+              onClick={handleResetKop}
+              className="px-3 py-1.5 rounded-xl border border-slate-300 font-bold text-slate-700"
+            >
+              Reset ke Kop Default
+            </button>
+          </div>
+          <div className="space-y-2 pt-2">
             <label className="flex items-center gap-2 font-semibold">
               <input
                 type="checkbox"
-                checked={cfg.use_kop_pdf}
-                onChange={(e) => setCfg({ ...cfg, use_kop_pdf: e.target.checked })}
+                checked={Boolean(form.use_kop_pdf)}
+                onChange={(e) => setForm({ ...form, use_kop_pdf: e.target.checked })}
               />
-              Gunakan Kop pada Cetak / PDF
+              <span>Tampilkan Kop Surat pada Cetak / PDF & Word</span>
             </label>
             <label className="flex items-center gap-2 font-semibold">
               <input
                 type="checkbox"
-                checked={cfg.use_kop_excel}
-                onChange={(e) => setCfg({ ...cfg, use_kop_excel: e.target.checked })}
+                checked={Boolean(form.use_kop_excel)}
+                onChange={(e) => setForm({ ...form, use_kop_excel: e.target.checked })}
               />
-              Gunakan Kop pada Ekspor Excel (.xlsx)
-            </label>
-            <label className="flex items-center gap-2 font-semibold">
-              <input
-                type="checkbox"
-                checked={cfg.use_kop_word}
-                onChange={(e) => setCfg({ ...cfg, use_kop_word: e.target.checked })}
-              />
-              Gunakan Kop pada Dokumen Word (.doc)
+              <span>Sertakan Kop Surat pada Ekspor Excel (.xlsx)</span>
             </label>
           </div>
         </div>
-
-        <div className="space-y-3">
+        <div className="space-y-3 border border-slate-200 rounded-2xl p-4">
+          <div className="font-extrabold text-slate-800">Pengaturan Halaman & Footer</div>
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="block font-bold text-slate-700 mb-1">Ukuran Kertas</label>
               <select
-                value={cfg.paper_size}
-                onChange={(e) => setCfg({ ...cfg, paper_size: e.target.value })}
+                value={form.paper_size}
+                onChange={(e) => setForm({ ...form, paper_size: e.target.value })}
                 className="w-full border border-slate-300 rounded-xl px-3 py-2"
               >
                 <option value="A4">A4</option>
@@ -6186,10 +6129,10 @@ function DocumentSettingsView({
               </select>
             </div>
             <div>
-              <label className="block font-bold text-slate-700 mb-1">Orientasi Halaman</label>
+              <label className="block font-bold text-slate-700 mb-1">Orientasi</label>
               <select
-                value={cfg.orientation}
-                onChange={(e) => setCfg({ ...cfg, orientation: e.target.value })}
+                value={form.orientation}
+                onChange={(e) => setForm({ ...form, orientation: e.target.value })}
                 className="w-full border border-slate-300 rounded-xl px-3 py-2"
               >
                 <option value="portrait">Portrait (Tegak)</option>
@@ -6202,8 +6145,8 @@ function DocumentSettingsView({
               <label className="block font-bold text-slate-700 mb-1">Atas (mm)</label>
               <input
                 type="number"
-                value={cfg.margin_top_mm}
-                onChange={(e) => setCfg({ ...cfg, margin_top_mm: Number(e.target.value) })}
+                value={form.margin_top_mm}
+                onChange={(e) => setForm({ ...form, margin_top_mm: Number(e.target.value) })}
                 className="w-full border border-slate-300 rounded-xl px-2 py-1.5"
               />
             </div>
@@ -6211,8 +6154,8 @@ function DocumentSettingsView({
               <label className="block font-bold text-slate-700 mb-1">Bawah (mm)</label>
               <input
                 type="number"
-                value={cfg.margin_bottom_mm}
-                onChange={(e) => setCfg({ ...cfg, margin_bottom_mm: Number(e.target.value) })}
+                value={form.margin_bottom_mm}
+                onChange={(e) => setForm({ ...form, margin_bottom_mm: Number(e.target.value) })}
                 className="w-full border border-slate-300 rounded-xl px-2 py-1.5"
               />
             </div>
@@ -6220,8 +6163,8 @@ function DocumentSettingsView({
               <label className="block font-bold text-slate-700 mb-1">Kiri (mm)</label>
               <input
                 type="number"
-                value={cfg.margin_left_mm}
-                onChange={(e) => setCfg({ ...cfg, margin_left_mm: Number(e.target.value) })}
+                value={form.margin_left_mm}
+                onChange={(e) => setForm({ ...form, margin_left_mm: Number(e.target.value) })}
                 className="w-full border border-slate-300 rounded-xl px-2 py-1.5"
               />
             </div>
@@ -6229,8 +6172,8 @@ function DocumentSettingsView({
               <label className="block font-bold text-slate-700 mb-1">Kanan (mm)</label>
               <input
                 type="number"
-                value={cfg.margin_right_mm}
-                onChange={(e) => setCfg({ ...cfg, margin_right_mm: Number(e.target.value) })}
+                value={form.margin_right_mm}
+                onChange={(e) => setForm({ ...form, margin_right_mm: Number(e.target.value) })}
                 className="w-full border border-slate-300 rounded-xl px-2 py-1.5"
               />
             </div>
@@ -6239,90 +6182,83 @@ function DocumentSettingsView({
             <label className="block font-bold text-slate-700 mb-1">Teks Footer Dokumen</label>
             <input
               type="text"
-              value={cfg.footer_text}
-              onChange={(e) => setCfg({ ...cfg, footer_text: e.target.value })}
+              value={form.footer_text}
+              onChange={(e) => setForm({ ...form, footer_text: e.target.value })}
               className="w-full border border-slate-300 rounded-xl px-3 py-2"
             />
           </div>
           <label className="flex items-center gap-2 font-semibold">
             <input
               type="checkbox"
-              checked={cfg.show_print_date}
-              onChange={(e) => setCfg({ ...cfg, show_print_date: e.target.checked })}
+              checked={Boolean(form.show_print_date)}
+              onChange={(e) => setForm({ ...form, show_print_date: e.target.checked })}
             />
-            Tampilkan Tanggal Cetak Otomatis
+            <span>Tampilkan Tanggal Cetak Otomatis</span>
           </label>
         </div>
       </div>
-
-      <div className="flex flex-wrap gap-2 pt-2">
-        <button
-          type="button"
-          onClick={() => onSaveDocumentSettings(cfg)}
-          className="px-4 py-2.5 rounded-xl bg-emerald-700 text-white font-extrabold flex items-center gap-1.5"
-        >
-          <Save className="w-4 h-4" />
-          Simpan Pengaturan Dokumen
-        </button>
-        <button
-          type="button"
-          onClick={handleTestPreview}
-          className="px-4 py-2.5 rounded-xl border border-slate-300 font-bold flex items-center gap-1.5"
-        >
-          <Printer className="w-4 h-4" />
-          Uji Cetak Dokumen
-        </button>
-      </div>
-    </div>
+      <button
+        type="submit"
+        className="px-4 py-2.5 rounded-xl bg-emerald-700 text-white font-extrabold flex items-center gap-1.5"
+      >
+        <Save className="w-4 h-4" />
+        Simpan Pengaturan Dokumen
+      </button>
+    </form>
   );
 }
 
 // ============================================================================
-// MODUL 12: BACKUP DATA & PENGATURAN AKUN / KREDENSIAL
+// MODUL 12: BACKUP DATA JSON
 // ============================================================================
 function BackupDataView({ isSimulation, payload, showBanner }) {
-  const handleDownloadJsonBackup = () => {
-    const prefix = isSimulation ? "SIMULASI_" : "";
-    const jsonStr = JSON.stringify(
-      {
-        exported_at: new Date().toISOString(),
-        is_simulation: Boolean(isSimulation),
-        ...payload
-      },
-      null,
-      2
+  const handleDownloadJson = () => {
+    const blob = new Blob(
+      [
+        JSON.stringify(
+          {
+            exported_at: new Date().toISOString(),
+            is_simulation: Boolean(isSimulation),
+            ...payload
+          },
+          null,
+          2
+        )
+      ],
+      { type: "application/json" }
     );
-    const blob = new Blob([jsonStr], { type: "application/json" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `${prefix}Backup_CBT_MIN4_Magelang_${new Date().toISOString().slice(0, 10)}.json`;
+    a.download = `${isSimulation ? "SIMULASI_" : ""}Backup_CBT_MIN4_MAGELANG.json`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
     showBanner("success", "File backup JSON berhasil diunduh.");
   };
-
   return (
-    <div className="bg-white border border-slate-200 rounded-2xl p-5 space-y-4 text-xs">
-      <h2 className="text-sm font-extrabold text-slate-900">Backup & Ekspor Data Sistem</h2>
+    <div className="bg-white border border-slate-200 rounded-2xl p-5 space-y-3 text-xs">
+      <h2 className="text-sm font-extrabold text-slate-900">Backup Data Sistem CBT</h2>
       <p className="text-slate-600">
-        Unduh salinan cadangan seluruh data madrasah, bank soal, jadwal ujian, dan hasil nilai ke
-        dalam format JSON.
+        Unduh cadangan data {isSimulation ? "SIMULASI" : "PRODUKSI"} dalam format JSON sebagai
+        arsip keamanan data madrasah.
       </p>
       <button
         type="button"
-        onClick={handleDownloadJsonBackup}
-        className="px-4 py-2.5 rounded-xl bg-emerald-700 text-white font-extrabold flex items-center gap-1.5"
+        onClick={handleDownloadJson}
+        className="px-4 py-2.5 rounded-xl bg-emerald-700 text-white font-extrabold inline-flex items-center gap-2"
       >
-        <HardDriveDownload className="w-4 h-4" />
-        Unduh Backup JSON Lengkap
+        <Download className="w-4 h-4" />
+        Unduh Backup JSON
       </button>
     </div>
   );
 }
 
+// ============================================================================
+// MODUL 13: PENGATURAN AKUN, KREDENSIAL SUPABASE & MANAJEMEN PROFIL
+// ============================================================================
 function AdminSettingsView({
   supabase,
   supabaseUrl,
@@ -6335,37 +6271,48 @@ function AdminSettingsView({
 }) {
   const [urlInput, setUrlInput] = useState(supabaseUrl);
   const [keyInput, setKeyInput] = useState(supabaseKey);
-  const [newRole, setNewRole] = useState("GURU");
-  const [newName, setNewName] = useState("");
+  const [newFullName, setNewFullName] = useState("");
   const [newUsername, setNewUsername] = useState("");
   const [newEmail, setNewEmail] = useState("");
+  const [newRole, setNewRole] = useState("GURU");
   const [newPassword, setNewPassword] = useState("");
+  const [creatingUser, setCreatingUser] = useState(false);
 
-  const handleCreateStaffAccount = async (e) => {
+  const handleSaveConn = (e) => {
+    e.preventDefault();
+    onUpdateCredentials(urlInput.trim(), keyInput.trim());
+  };
+
+  const handleCreateAccount = async (e) => {
     e.preventDefault();
     if (!supabase) return showBanner("error", "Supabase belum terhubung.");
     if (newPassword.length < 8) {
-      return showBanner("error", "Password minimal 8 karakter.");
+      return showBanner("error", "Password akun baru minimal 8 karakter.");
     }
+    setCreatingUser(true);
     try {
       const cleanEmail = newEmail.trim().toLowerCase();
-      const cleanUser = newUsername.trim().toLowerCase();
-      const { data: signUpData, error: signUpErr } = await supabase.auth.signUp({
+      const cleanUsername = newUsername.trim().toLowerCase();
+      const cleanName = newFullName.trim();
+      const tempClient = createSupabaseClient(supabaseUrl, supabaseKey, {
+        auth: { persistSession: false, autoRefreshToken: false }
+      });
+      const { data: signUpData, error: signUpError } = await tempClient.auth.signUp({
         email: cleanEmail,
         password: newPassword
       });
-      if (signUpErr) throw signUpErr;
-      const uid = signUpData?.user?.id;
-      if (!uid) {
+      if (signUpError) throw signUpError;
+      const newUserId = signUpData?.user?.id;
+      if (!newUserId) {
         throw new Error(
           "Akun Auth dibuat namun konfirmasi email aktif di Supabase. Nonaktifkan 'Confirm email' pada Auth Providers Supabase."
         );
       }
       const { error: profErr } = await supabase.from("profiles").insert([
         {
-          id: uid,
-          full_name: newName.trim(),
-          username: cleanUser,
+          id: newUserId,
+          full_name: cleanName,
+          username: cleanUsername,
           email: cleanEmail,
           role: newRole,
           is_active: true,
@@ -6373,76 +6320,80 @@ function AdminSettingsView({
         }
       ]);
       if (profErr) throw profErr;
-      setNewName("");
+      setNewFullName("");
       setNewUsername("");
       setNewEmail("");
       setNewPassword("");
       await onRefresh();
-      showBanner("success", `Akun ${newRole} berhasil dibuat dan aktif.`);
+      showBanner(
+        "success",
+        `Akun ${newRole} (${cleanName}) berhasil dibuat dan langsung dapat login.`
+      );
     } catch (err) {
       showBanner("error", `Gagal membuat akun: ${err.message}`);
+    } finally {
+      setCreatingUser(false);
     }
+  };
+
+  const handleToggleActive = async (prof) => {
+    if (!supabase) return;
+    const { error } = await supabase
+      .from("profiles")
+      .update({ is_active: !prof.is_active })
+      .eq("id", prof.id);
+    if (error) return showBanner("error", error.message);
+    await onRefresh();
+    showBanner("success", `Status akun ${prof.full_name} diperbarui.`);
   };
 
   return (
     <div className="space-y-5 text-xs">
-      <div className="bg-white border border-slate-200 rounded-2xl p-5 space-y-3">
-        <h2 className="text-sm font-extrabold text-slate-900">Koneksi Database Supabase</h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-          <div>
-            <label className="block font-bold text-slate-700 mb-1">Supabase Project URL</label>
-            <input
-              type="text"
-              value={urlInput}
-              onChange={(e) => setUrlInput(e.target.value)}
-              className="w-full border border-slate-300 rounded-xl px-3 py-2 font-mono"
-            />
-          </div>
-          <div>
-            <label className="block font-bold text-slate-700 mb-1">Supabase Anon / Publishable Key</label>
-            <input
-              type="text"
-              value={keyInput}
-              onChange={(e) => setKeyInput(e.target.value)}
-              className="w-full border border-slate-300 rounded-xl px-3 py-2 font-mono"
-            />
-          </div>
+      <form
+        onSubmit={handleSaveConn}
+        className="bg-white border border-slate-200 rounded-2xl p-5 space-y-3"
+      >
+        <h2 className="text-sm font-extrabold text-slate-900">Konfigurasi Koneksi Supabase</h2>
+        <div>
+          <label className="block font-bold text-slate-700 mb-1">Supabase Project URL</label>
+          <input
+            type="text"
+            value={urlInput}
+            onChange={(e) => setUrlInput(e.target.value)}
+            className="w-full border border-slate-300 rounded-xl px-3 py-2 font-mono"
+          />
+        </div>
+        <div>
+          <label className="block font-bold text-slate-700 mb-1">Supabase Publishable / Anon Key</label>
+          <input
+            type="text"
+            value={keyInput}
+            onChange={(e) => setKeyInput(e.target.value)}
+            className="w-full border border-slate-300 rounded-xl px-3 py-2 font-mono"
+          />
         </div>
         <button
-          type="button"
-          onClick={() => onUpdateCredentials(urlInput.trim(), keyInput.trim())}
-          className="px-4 py-2 rounded-xl bg-emerald-700 text-white font-bold"
+          type="submit"
+          className="px-4 py-2 rounded-xl bg-emerald-700 text-white font-extrabold"
         >
-          Simpan Kredensial Supabase
+          Simpan Konfigurasi Koneksi
         </button>
-      </div>
-
+      </form>
       <form
-        onSubmit={handleCreateStaffAccount}
+        onSubmit={handleCreateAccount}
         className="bg-white border border-slate-200 rounded-2xl p-5 space-y-3"
       >
         <h2 className="text-sm font-extrabold text-slate-900">
-          Tambah Akun Petugas / Guru / Admin
+          Buat Akun Login Baru (Admin / Guru)
         </h2>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
-          <div>
-            <label className="block font-bold text-slate-700 mb-1">Peran</label>
-            <select
-              value={newRole}
-              onChange={(e) => setNewRole(e.target.value)}
-              className="w-full border border-slate-300 rounded-xl px-3 py-2"
-            >
-              <option value="GURU">GURU</option>
-              <option value="ADMIN">ADMIN</option>
-            </select>
-          </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 items-end">
           <div>
             <label className="block font-bold text-slate-700 mb-1">Nama Lengkap</label>
             <input
               type="text"
               required
-              value={newName}
-              onChange={(e) => setNewName(e.target.value)}
+              value={newFullName}
+              onChange={(e) => setNewFullName(e.target.value)}
               className="w-full border border-slate-300 rounded-xl px-3 py-2"
             />
           </div>
@@ -6467,44 +6418,87 @@ function AdminSettingsView({
             />
           </div>
           <div>
-            <label className="block font-bold text-slate-700 mb-1">Password (Min. 8)</label>
-            <input
-              type="password"
-              required
-              minLength={8}
-              value={newPassword}
-              onChange={(e) => setNewPassword(e.target.value)}
+            <label className="block font-bold text-slate-700 mb-1">Peran (Role)</label>
+            <select
+              value={newRole}
+              onChange={(e) => setNewRole(e.target.value)}
               className="w-full border border-slate-300 rounded-xl px-3 py-2"
-            />
+            >
+              <option value="GURU">GURU</option>
+              <option value="ADMIN">ADMIN</option>
+            </select>
+          </div>
+          <div>
+            <label className="block font-bold text-slate-700 mb-1">Password (Min 8)</label>
+            <div className="flex gap-2">
+              <input
+                type="password"
+                required
+                minLength={8}
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+                className="w-full border border-slate-300 rounded-xl px-3 py-2"
+              />
+              <button
+                type="submit"
+                disabled={creatingUser}
+                className="px-3.5 py-2 rounded-xl bg-emerald-700 text-white font-extrabold shrink-0"
+              >
+                {creatingUser ? "..." : "Buat"}
+              </button>
+            </div>
           </div>
         </div>
-        <button
-          type="submit"
-          className="px-4 py-2 rounded-xl bg-emerald-700 text-white font-bold"
-        >
-          Daftarkan Akun Baru
-        </button>
       </form>
-
-      <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
+      <div className="bg-white border border-slate-200 rounded-2xl overflow-x-auto">
         <table className="w-full text-xs">
           <thead className="bg-slate-50 border-b border-slate-200 font-bold text-slate-700">
             <tr>
-              <th className="p-3 text-left">Nama</th>
+              <th className="p-3 text-left">Nama Lengkap</th>
               <th className="p-3 text-left">Username</th>
               <th className="p-3 text-left">Email</th>
               <th className="p-3 text-center">Peran</th>
+              <th className="p-3 text-center">Status</th>
+              <th className="p-3 text-right">Aksi</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
-            {profilesList.map((p) => (
-              <tr key={p.id}>
-                <td className="p-3 font-bold">{p.full_name}</td>
-                <td className="p-3 font-mono">{p.username}</td>
-                <td className="p-3">{p.email}</td>
-                <td className="p-3 text-center font-bold text-emerald-800">{p.role}</td>
+            {profilesList.length === 0 ? (
+              <tr>
+                <td colSpan={6} className="p-6 text-center text-slate-500">
+                  Belum ada profil pengguna pada mode ini.
+                </td>
               </tr>
-            ))}
+            ) : (
+              profilesList.map((p) => (
+                <tr key={p.id}>
+                  <td className="p-3 font-bold">{p.full_name}</td>
+                  <td className="p-3 font-mono">{p.username}</td>
+                  <td className="p-3">{p.email}</td>
+                  <td className="p-3 text-center font-bold">{p.role}</td>
+                  <td className="p-3 text-center">
+                    <span
+                      className={`px-2 py-0.5 rounded-full font-bold ${
+                        p.is_active
+                          ? "bg-emerald-50 text-emerald-800"
+                          : "bg-red-50 text-red-700"
+                      }`}
+                    >
+                      {p.is_active ? "Aktif" : "Nonaktif"}
+                    </span>
+                  </td>
+                  <td className="p-3 text-right">
+                    <button
+                      type="button"
+                      onClick={() => handleToggleActive(p)}
+                      className="px-2.5 py-1 rounded-lg border border-slate-300 font-bold hover:bg-slate-50"
+                    >
+                      {p.is_active ? "Nonaktifkan" : "Aktifkan"}
+                    </button>
+                  </td>
+                </tr>
+              ))
+            )}
           </tbody>
         </table>
       </div>
@@ -6512,9 +6506,6 @@ function AdminSettingsView({
   );
 }
 
-// ============================================================================
-// EKSPOR DEFAULT DENGAN ERROR BOUNDARY
-// ============================================================================
 export default function App() {
   return (
     <ErrorBoundary>
