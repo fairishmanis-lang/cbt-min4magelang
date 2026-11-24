@@ -5725,6 +5725,55 @@ function ParticipantsManagerView({
 // ============================================================================
 // MODUL 7: PORTAL UJIAN SISWA (KUNCI KETAT SESUAI JADWAL, TIMER & SIMPAN)
 // ============================================================================
+const normalizeSingleTrueFalseToken = (val: unknown) => {
+  const token = normalizeStatementToken(val);
+  return token === "B" || token === "S" ? token : "";
+};
+
+const normalizeSingleSuitabilityToken = (val: unknown) => {
+  const token = normalizeStatementToken(val);
+  return token === "T" || token === "TT" ? token : "";
+};
+
+const extractExamStatements = (question: any, qType: string) => {
+  const rawOpts = Array.isArray(question?.options) ? question.options : [];
+  const validOpts = rawOpts.filter((o: any) => {
+    const text = String(o?.text ?? "").trim();
+    if (!text) return false;
+    const keyUpper = String(o?.key ?? "").trim().toUpperCase();
+    // Abaikan label bawaan Benar/Salah tunggal agar tidak terdeteksi sebagai pernyataan kompleks
+    if (
+      qType === "BENAR_SALAH" &&
+      rawOpts.length === 2 &&
+      (keyUpper === "BENAR" || keyUpper === "SALAH") &&
+      (text.toLowerCase() === "benar" || text.toLowerCase() === "salah")
+    ) {
+      return false;
+    }
+    return true;
+  });
+
+  if (validOpts.length > 0) {
+    return validOpts.map((o: any, idx: number) => ({
+      key: o.key || `P${idx + 1}`,
+      text: o.text
+    }));
+  }
+
+  return [
+    question?.option_a,
+    question?.option_b,
+    question?.option_c,
+    question?.option_d,
+    question?.option_e
+  ]
+    .map((v: any) => String(v ?? "").trim())
+    .filter(Boolean)
+    .map((text: string, idx: number) => ({
+      key: `P${idx + 1}`,
+      text
+    }));
+};
 function StudentExamPortalView({
   mode,
   supabase,
@@ -6148,53 +6197,120 @@ function StudentExamPortalView({
                 })}
               </div>
             )}
-            {(qType === "BENAR_SALAH" || qType === "TEPAT_TIDAK_TEPAT") && (
-              <div className="space-y-2 text-xs">
-                {(opts.length > 0 ? opts : [{ key: "P1", text: "Pernyataan Utama" }]).map(
-                  (o, idx) => {
-                    const tokA = qType === "BENAR_SALAH" ? "B" : "T";
-                    const tokB = qType === "BENAR_SALAH" ? "S" : "TT";
-                    const lblA = qType === "BENAR_SALAH" ? "Benar (B)" : "Tepat (T)";
-                    const lblB = qType === "BENAR_SALAH" ? "Salah (S)" : "Tidak Tepat (TT)";
-                    const chosen = statementTokens[idx] || "";
-                    return (
-                      <div
-                        key={o.key || idx}
-                        className="p-3 rounded-xl border border-slate-200 flex flex-wrap items-center justify-between gap-2"
-                      >
-                        <span className="font-semibold flex-1">
-                          <RichQuestionContent content={o.text} className="inline" />
-                        </span>
-                        <div className="flex gap-2">
-                          <button
-                            type="button"
-                            onClick={() => setStatementChoice(idx, tokA)}
-                            className={`px-3 py-1 rounded-lg border font-bold ${
-                              chosen === tokA
-                                ? "bg-emerald-700 text-white border-emerald-700"
-                                : "bg-white text-slate-700 border-slate-300"
-                            }`}
-                          >
-                            {lblA}
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => setStatementChoice(idx, tokB)}
-                            className={`px-3 py-1 rounded-lg border font-bold ${
-                              chosen === tokB
-                                ? "bg-emerald-700 text-white border-emerald-700"
-                                : "bg-white text-slate-700 border-slate-300"
-                            }`}
-                          >
-                            {lblB}
-                          </button>
-                        </div>
-                      </div>
-                    );
-                  }
-                )}
-              </div>
-            )}
+            {(qType === "BENAR_SALAH" || qType === "TEPAT_TIDAK_TEPAT") && (() => {
+  const rawOpts = Array.isArray(q?.options) ? q.options : [];
+  const statementList = rawOpts.filter((o) => {
+    const text = String(o?.text ?? "").trim();
+    if (!text) return false;
+    const keyUpper = String(o?.key ?? "").trim().toUpperCase();
+    if (
+      qType === "BENAR_SALAH" &&
+      rawOpts.length === 2 &&
+      (keyUpper === "BENAR" || keyUpper === "SALAH") &&
+      (text.toLowerCase() === "benar" || text.toLowerCase() === "salah")
+    ) {
+      return false;
+    }
+    return true;
+  });
+
+  const isSingleTrueFalse = qType === "BENAR_SALAH" && statementList.length <= 1;
+
+  if (isSingleTrueFalse) {
+    const firstToken = normalizeStatementToken(
+      String(currentAns || "").split(/[,;|]+/)[0].trim()
+    );
+    const selectedChoice = firstToken === "B" || firstToken === "S" ? firstToken : "";
+
+    return (
+      <div className="space-y-2.5 text-xs">
+        {statementList.length === 1 && (
+          <div className="p-3 rounded-xl bg-slate-50 border border-slate-200 font-semibold text-slate-800">
+            <RichQuestionContent content={statementList[0].text} className="inline" />
+          </div>
+        )}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+          {[
+            { value: "B", label: "Benar" },
+            { value: "S", label: "Salah" }
+          ].map((choice) => {
+            const active = selectedChoice === choice.value;
+            return (
+              <button
+                key={choice.value}
+                type="button"
+                onClick={() => handleAnswerChange(q.id, choice.value)}
+                className={`p-3.5 rounded-xl border text-left font-bold transition flex items-center justify-between ${
+                  active
+                    ? "bg-emerald-700 text-white border-emerald-700"
+                    : "bg-white text-slate-700 border-slate-300 hover:border-emerald-500"
+                }`}
+              >
+                <span>{choice.label}</span>
+                <span
+                  className={`text-[11px] px-2 py-0.5 rounded-md ${
+                    active ? "bg-white/20 text-white" : "bg-slate-100 text-slate-600"
+                  }`}
+                >
+                  {choice.value}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+    );
+  }
+
+  const itemsToRender =
+    statementList.length > 0 ? statementList : [{ key: "P1", text: "Pernyataan Utama" }];
+
+  return (
+    <div className="space-y-2 text-xs">
+      {itemsToRender.map((o, idx) => {
+        const tokA = qType === "BENAR_SALAH" ? "B" : "T";
+        const tokB = qType === "BENAR_SALAH" ? "S" : "TT";
+        const lblA = qType === "BENAR_SALAH" ? "Benar (B)" : "Tepat (T)";
+        const lblB = qType === "BENAR_SALAH" ? "Salah (S)" : "Tidak Tepat (TT)";
+        const chosen = normalizeStatementToken(statementTokens[idx] || "");
+        return (
+          <div
+            key={o.key || idx}
+            className="p-3 rounded-xl border border-slate-200 flex flex-wrap items-center justify-between gap-2"
+          >
+            <span className="font-semibold flex-1">
+              <RichQuestionContent content={o.text} className="inline" />
+            </span>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => setStatementChoice(idx, tokA)}
+                className={`px-3 py-1 rounded-lg border font-bold ${
+                  chosen === tokA
+                    ? "bg-emerald-700 text-white border-emerald-700"
+                    : "bg-white text-slate-700 border-slate-300"
+                }`}
+              >
+                {lblA}
+              </button>
+              <button
+                type="button"
+                onClick={() => setStatementChoice(idx, tokB)}
+                className={`px-3 py-1 rounded-lg border font-bold ${
+                  chosen === tokB
+                    ? "bg-emerald-700 text-white border-emerald-700"
+                    : "bg-white text-slate-700 border-slate-300"
+                }`}
+              >
+                {lblB}
+              </button>
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+})()}
             {(qType === "ISIAN_SINGKAT" || qType === "ESSAY") && (
               <div>
                 <textarea
