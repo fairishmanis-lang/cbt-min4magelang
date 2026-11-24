@@ -6198,45 +6198,37 @@ function StudentExamPortalView({
               </div>
             )}
           {(qType === "BENAR_SALAH" || qType === "TEPAT_TIDAK_TEPAT") && (() => {
-  const toCleanText = (val: unknown) =>
+  const toPlainText = (val: unknown) =>
     String(val ?? "")
       .replace(/<[^>]*>/g, " ")
-      .replace(/[\u200B-\u200D\uFEFF]/g, "")
+      .replace(/&nbsp;/gi, " ")
       .replace(/\s+/g, " ")
       .trim()
       .toLowerCase();
 
   const rawOpts = Array.isArray(q?.options) ? q.options : [];
-  const nonEmptyOpts = rawOpts.filter((o) => toCleanText(o?.text) !== "");
+  const nonEmptyOpts = rawOpts.filter((o) => toPlainText(o?.text) !== "");
 
-  const isSuitabilityChoiceLabelsOnly =
-    qType === "TEPAT_TIDAK_TEPAT" &&
-    nonEmptyOpts.length > 0 &&
+  const isSingleLabelPair =
+    nonEmptyOpts.length === 2 &&
     nonEmptyOpts.every((o) => {
-      const t = toCleanText(o?.text);
-      return t === "tepat" || t === "tidak tepat" || t === "tidak_tepat" || t === "t" || t === "tt";
+      const t = toPlainText(o?.text);
+      if (qType === "TEPAT_TIDAK_TEPAT") {
+        return t.includes("tepat") || t === "t" || t === "tt";
+      }
+      return t.includes("benar") || t.includes("salah") || t === "b" || t === "s";
     });
 
-  const isTrueFalseChoiceLabelsOnly =
-    qType === "BENAR_SALAH" &&
-    nonEmptyOpts.length > 0 &&
-    nonEmptyOpts.every((o) => {
-      const t = toCleanText(o?.text);
-      return t === "benar" || t === "salah" || t === "b" || t === "s";
-    });
+  const statementItems = isSingleLabelPair ? [] : nonEmptyOpts;
 
-  const statements =
-    isSuitabilityChoiceLabelsOnly || isTrueFalseChoiceLabelsOnly ? [] : nonEmptyOpts;
-
-  // 1 pernyataan (atau tanpa daftar pernyataan multi-baris): tampilkan 2 pilihan saja
-  if (statements.length <= 1) {
+  if (statementItems.length <= 1) {
     const firstToken = normalizeStatementToken(
       String(currentAns || "").split(/[,;|]+/)[0].trim()
     );
     const validTokens = qType === "BENAR_SALAH" ? ["B", "S"] : ["T", "TT"];
     const selectedChoice = validTokens.includes(firstToken) ? firstToken : "";
 
-    const twoChoices =
+    const choices =
       qType === "BENAR_SALAH"
         ? [
             { value: "B", label: "Benar" },
@@ -6249,13 +6241,13 @@ function StudentExamPortalView({
 
     return (
       <div className="space-y-2.5 text-xs">
-        {statements.length === 1 && (
+        {statementItems.length === 1 && (
           <div className="p-3 rounded-xl bg-slate-50 border border-slate-200 font-semibold text-slate-800">
-            <RichQuestionContent content={statements[0].text} className="inline" />
+            <RichQuestionContent content={statementItems[0].text} className="inline" />
           </div>
         )}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-          {twoChoices.map((choice) => {
+          {choices.map((choice) => {
             const active = selectedChoice === choice.value;
             return (
               <button
@@ -6284,10 +6276,9 @@ function StudentExamPortalView({
     );
   }
 
-  // Beberapa pernyataan (> 1): tampilkan pilihan pada setiap pernyataan
   return (
     <div className="space-y-2 text-xs">
-      {statements.map((o, idx) => {
+      {statementItems.map((o, idx) => {
         const tokA = qType === "BENAR_SALAH" ? "B" : "T";
         const tokB = qType === "BENAR_SALAH" ? "S" : "TT";
         const lblA = qType === "BENAR_SALAH" ? "Benar (B)" : "Tepat (T)";
