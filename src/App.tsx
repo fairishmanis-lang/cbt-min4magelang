@@ -6197,7 +6197,7 @@ function StudentExamPortalView({
                 })}
               </div>
             )}
-           {(qType === "BENAR_SALAH" || qType === "TEPAT_TIDAK_TEPAT") && (() => {
+          {(qType === "BENAR_SALAH" || qType === "TEPAT_TIDAK_TEPAT") && (() => {
   const rawOpts = Array.isArray(q?.options) ? q.options : [];
   const statementList = rawOpts.filter((o) => {
     const text = String(o?.text ?? "").trim();
@@ -6205,7 +6205,6 @@ function StudentExamPortalView({
     const keyUpper = String(o?.key ?? "").trim().toUpperCase();
     const textLower = text.toLowerCase();
 
-    // Abaikan label bawaan Benar/Salah tunggal
     if (
       qType === "BENAR_SALAH" &&
       rawOpts.length === 2 &&
@@ -6215,7 +6214,6 @@ function StudentExamPortalView({
       return false;
     }
 
-    // Abaikan label bawaan Tepat/Tidak Tepat tunggal (mis. pada soal dengan 1 pertanyaan utama)
     if (
       qType === "TEPAT_TIDAK_TEPAT" &&
       rawOpts.length === 2 &&
@@ -6288,80 +6286,6 @@ function StudentExamPortalView({
   return (
     <div className="space-y-2 text-xs">
       {statementList.map((o, idx) => {
-        const tokA = qType === "BENAR_SALAH" ? "B" : "T";
-        const tokB = qType === "BENAR_SALAH" ? "S" : "TT";
-        const lblA = qType === "BENAR_SALAH" ? "Benar (B)" : "Tepat (T)";
-        const lblB = qType === "BENAR_SALAH" ? "Salah (S)" : "Tidak Tepat (TT)";
-        const chosen = normalizeStatementToken(statementTokens[idx] || "");
-        return (
-          <div
-            key={o.key || idx}
-            className="p-3 rounded-xl border border-slate-200 flex flex-wrap items-center justify-between gap-2"
-          >
-            <span className="font-semibold flex-1">
-              <RichQuestionContent content={o.text} className="inline" />
-            </span>
-            <div className="flex gap-2">
-              <button
-                type="button"
-                onClick={() => setStatementChoice(idx, tokA)}
-                className={`px-3 py-1 rounded-lg border font-bold ${
-                  chosen === tokA
-                    ? "bg-emerald-700 text-white border-emerald-700"
-                    : "bg-white text-slate-700 border-slate-300"
-                }`}
-              >
-                {lblA}
-              </button>
-              <button
-                type="button"
-                onClick={() => setStatementChoice(idx, tokB)}
-                className={`px-3 py-1 rounded-lg border font-bold ${
-                  chosen === tokB
-                    ? "bg-emerald-700 text-white border-emerald-700"
-                    : "bg-white text-slate-700 border-slate-300"
-                }`}
-              >
-                {lblB}
-              </button>
-            </div>
-          </div>
-        );
-      })}
-    </div>
-  );
-})()}
-                key={choice.value}
-                type="button"
-                onClick={() => handleAnswerChange(q.id, choice.value)}
-                className={`p-3.5 rounded-xl border text-left font-bold transition flex items-center justify-between ${
-                  active
-                    ? "bg-emerald-700 text-white border-emerald-700"
-                    : "bg-white text-slate-700 border-slate-300 hover:border-emerald-500"
-                }`}
-              >
-                <span>{choice.label}</span>
-                <span
-                  className={`text-[11px] px-2 py-0.5 rounded-md ${
-                    active ? "bg-white/20 text-white" : "bg-slate-100 text-slate-600"
-                  }`}
-                >
-                  {choice.value}
-                </span>
-              </button>
-            );
-          })}
-        </div>
-      </div>
-    );
-  }
-
-  const itemsToRender =
-    statementList.length > 0 ? statementList : [{ key: "P1", text: "Pernyataan Utama" }];
-
-  return (
-    <div className="space-y-2 text-xs">
-      {itemsToRender.map((o, idx) => {
         const tokA = qType === "BENAR_SALAH" ? "B" : "T";
         const tokB = qType === "BENAR_SALAH" ? "S" : "TT";
         const lblA = qType === "BENAR_SALAH" ? "Benar (B)" : "Tepat (T)";
