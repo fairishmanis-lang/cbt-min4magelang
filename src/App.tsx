@@ -6198,33 +6198,37 @@ function StudentExamPortalView({
               </div>
             )}
           {(qType === "BENAR_SALAH" || qType === "TEPAT_TIDAK_TEPAT") && (() => {
+  const stripHtmlAndSpaces = (v: unknown) =>
+    String(v ?? "")
+      .replace(/<[^>]*>/g, " ")
+      .replace(/\s+/g, " ")
+      .trim()
+      .toLowerCase();
+
   const rawOpts = Array.isArray(q?.options) ? q.options : [];
-  const statementList = rawOpts.filter((o) => {
-    const text = String(o?.text ?? "").trim();
-    if (!text) return false;
-    const keyUpper = String(o?.key ?? "").trim().toUpperCase();
-    const textLower = text.toLowerCase();
+  const nonEmptyOpts = rawOpts.filter(
+    (o) => stripHtmlAndSpaces(o?.text) !== ""
+  );
 
-    if (
-      qType === "BENAR_SALAH" &&
-      rawOpts.length === 2 &&
-      (keyUpper === "BENAR" || keyUpper === "SALAH") &&
-      (textLower === "benar" || textLower === "salah")
-    ) {
-      return false;
-    }
+  // Cek apakah opsi hanya berupa label pilihan ("Tepat" / "Tidak Tepat" atau "Benar" / "Salah")
+  const isOnlySuitabilityLabels =
+    qType === "TEPAT_TIDAK_TEPAT" &&
+    nonEmptyOpts.length > 0 &&
+    nonEmptyOpts.every((o) => {
+      const clean = stripHtmlAndSpaces(o?.text);
+      return clean === "tepat" || clean === "tidak tepat" || clean === "t" || clean === "tt";
+    });
 
-    if (
-      qType === "TEPAT_TIDAK_TEPAT" &&
-      rawOpts.length === 2 &&
-      (keyUpper === "TEPAT" || keyUpper === "TIDAK_TEPAT") &&
-      (textLower === "tepat" || textLower === "tidak tepat")
-    ) {
-      return false;
-    }
+  const isOnlyTrueFalseLabels =
+    qType === "BENAR_SALAH" &&
+    nonEmptyOpts.length > 0 &&
+    nonEmptyOpts.every((o) => {
+      const clean = stripHtmlAndSpaces(o?.text);
+      return clean === "benar" || clean === "salah" || clean === "b" || clean === "s";
+    });
 
-    return true;
-  });
+  const statementList =
+    isOnlySuitabilityLabels || isOnlyTrueFalseLabels ? [] : nonEmptyOpts;
 
   const isSingleChoiceMode = statementList.length <= 1;
 
