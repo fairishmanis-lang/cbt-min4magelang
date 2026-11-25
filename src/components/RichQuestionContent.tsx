@@ -15,18 +15,23 @@ export default function RichQuestionContent({
   const htmlSiapTampil = useMemo(() => {
     if (!content) return '';
 
-    let olahan = String(content);
+    let olahan = String(content).replace(/\r\n/g, '\n');
 
-    // Render rumus blok $$...$$
+    // Lindungi blok $$...$$ sementara agar karakter di dalamnya tidak terganggu
+    const mathBlocks: string[] = [];
     olahan = olahan.replace(/\$\$([\s\S]+?)\$\$/g, (_, rumus: string) => {
+      let rendered = rumus;
       try {
-        return katex.renderToString(rumus.trim(), {
+        rendered = katex.renderToString(rumus.trim(), {
           displayMode: true,
           throwOnError: false,
         });
       } catch {
-        return rumus;
+        rendered = rumus;
       }
+      const token = `@@MATHBLOCK_${mathBlocks.length}@@`;
+      mathBlocks.push(rendered);
+      return token;
     });
 
     // Render rumus sebaris $...$ (termasuk \frac{a}{b})
@@ -39,6 +44,14 @@ export default function RichQuestionContent({
       } catch {
         return rumus;
       }
+    });
+
+    // Ubah Enter (\n) menjadi <br /> agar baris baru tampil rapi di soal & opsi
+    olahan = olahan.replace(/\n/g, '<br />');
+
+    // Kembalikan blok rumus $$...$$
+    olahan = olahan.replace(/@@MATHBLOCK_(\d+)@@/g, (_, idx: string) => {
+      return mathBlocks[Number(idx)] ?? '';
     });
 
     // Bersihkan tag berbahaya, tapi izinkan gambar, tabel, dan rumus
