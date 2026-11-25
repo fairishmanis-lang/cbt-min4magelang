@@ -3774,6 +3774,50 @@ function buildOptionsByType(qType, optA, optB, optC, optD, optE = "") {
   }
   return [];
 }
+const uploadQuestionImageFile = async (supabaseClient: any, file: File): Promise<string> => {
+  const maxBytes = 2 * 1024 * 1024; // Maksimal 2 MB
+  if (file.size > maxBytes) {
+    throw new Error("Ukuran gambar maksimal 2 MB.");
+  }
+
+  const readAsDataUrl = (f: File) =>
+    new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(String(reader.result || ""));
+      reader.onerror = () => reject(new Error("Gagal membaca file gambar."));
+      reader.readAsDataURL(f);
+    });
+
+  if (supabaseClient && typeof supabaseClient.storage?.from === "function") {
+    const ext = (file.name.split(".").pop() || "png").toLowerCase().replace(/[^a-z0-9]/g, "");
+    const safeName = `${Date.now()}_${Math.random().toString(36).slice(2, 8)}.${ext || "png"}`;
+    const filePath = `soal/${safeName}`;
+
+    const { error: uploadErr } = await supabaseClient.storage
+      .from("question-images")
+      .upload(filePath, file, {
+        cacheControl: "3600",
+        upsert: false
+      });
+
+    if (!uploadErr) {
+      const { data: pubData } = supabaseClient.storage
+        .from("question-images")
+        .getPublicUrl(filePath);
+      if (pubData?.publicUrl) {
+        return pubData.publicUrl;
+      }
+    }
+  }
+
+  return await readAsDataUrl(file);
+};
+
+const appendImageTagToText = (currentText: string, imageUrl: string) => {
+  const imgHtml = `<img src="${imageUrl}" alt="Gambar Soal" style="max-width:100%;max-height:280px;border-radius:12px;margin-top:8px;margin-bottom:8px;display:block;" />`;
+  const trimmed = String(currentText || "").trimEnd();
+  return trimmed ? `${trimmed}\n${imgHtml}` : imgHtml;
+};
 function QuestionBankManagerView({
   supabase,
   currentUser,
