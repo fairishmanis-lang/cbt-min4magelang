@@ -6008,37 +6008,64 @@ function StudentExamPortalView({
     } catch {
       localSavedMap = {};
     }
-    const dbSavedMap = {};
-    studentAnswers
-      .filter((a) => a.exam_id === targetExam.id && String(a.student_id) === String(currentUser.id))
-      .forEach((a) => {
-        if (a.question_id && a.answer) dbSavedMap[a.question_id] = a.answer;
+   const dbSavedMap = {};
+  studentAnswers
+    .filter((a) => a.exam_id === targetExam.id && String(a.student_id) === String(currentUser.id))
+    .forEach((a) => {
+      if (a.question_id && a.answer) dbSavedMap[a.question_id] = a.answer;
+    });
+  if (supabase) {
+    const { data: latestDbAns } = await supabase
+      .from("student_answers")
+      .select("*")
+      .eq("exam_id", targetExam.id)
+      .eq("student_id", currentUser.id)
+      .limit(1000);
+    if (Array.isArray(latestDbAns)) {
+      latestDbAns.forEach((a) => {
+        if (a.question_id && a.answer) {
+          dbSavedMap[a.question_id] = a.answer;
+        }
       });
-    const currentAnswers = { ...dbSavedMap, ...localSavedMap, ...answersMap };
-    if (supabase) {
+    }
+  }
+  const currentAnswers = { ...dbSavedMap, ...localSavedMap, ...answersMap };
+  const nextStatus = isAuto ? "AUTO_TIMEOUT" : "SELESAI";
+  if (supabase) {
+    const { data: existingAttempt } = await supabase
+      .from("exam_attempts")
+      .select("id")
+      .eq("exam_id", targetExam.id)
+      .eq("student_id", currentUser.id)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (existingAttempt?.id) {
+      await supabase
+        .from("exam_attempts")
+        .update({
+          student_name: currentUser.full_name,
+          answers: currentAnswers,
+          status: nextStatus,
+          submitted_at: new Date().toISOString(),
+          is_simulation: Boolean(isSimulation),
+        })
+        .eq("id", existingAttempt.id);
+    } else {
       await supabase.from("exam_attempts").insert([
         {
           exam_id: targetExam.id,
           student_id: currentUser.id,
           student_name: currentUser.full_name,
           answers: currentAnswers,
-          status: isAuto ? "AUTO_TIMEOUT" : "SELESAI",
-          is_simulation: Boolean(isSimulation)
-        }
+          status: nextStatus,
+          submitted_at: new Date().toISOString(),
+          is_simulation: Boolean(isSimulation),
+        },
       ]);
-      const { data: latestDbAns } = await supabase
-        .from("student_answers")
-        .select("*")
-        .eq("exam_id", targetExam.id)
-        .eq("student_id", currentUser.id)
-        .limit(1000);
-      if (Array.isArray(latestDbAns)) {
-        latestDbAns.forEach((a) => {
-          if (a.question_id && a.answer && !currentAnswers[a.question_id]) {
-            currentAnswers[a.question_id] = a.answer;
-          }
-        });
-      }
+    }
+  }
       const fullQuestions = await fetchQuestionsByIdsSafe(
         supabase,
         targetExam.question_ids,
