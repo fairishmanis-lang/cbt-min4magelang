@@ -1725,12 +1725,13 @@ const stdQuery = isStudentUser
       console.error("Refresh data error:", err);
     }
   };
-  useEffect(() => {
-    refreshAllData();
-    if (!currentUser || !supabase) return;
-    const timer = setInterval(refreshAllData, 15000);
-    return () => clearInterval(timer);
-  }, [supabase, currentUser, isSimulationMode]);
+  const refreshAllDataRef = useRef(refreshAllData);
+refreshAllDataRef.current = refreshAllData;
+
+useEffect(() => {
+  if (!currentUser || !supabase) return;
+  refreshAllDataRef.current();
+}, [supabase, currentUser?.id, currentUser?.role, isSimulationMode]);
   const handleInitialAdminSetup = async (e) => {
     e.preventDefault();
     if (!supabase) return showBanner("error", "Koneksi Supabase belum terkonfigurasi.");
