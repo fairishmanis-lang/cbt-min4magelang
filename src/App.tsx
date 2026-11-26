@@ -6086,7 +6086,7 @@ function StudentExamPortalView({
         is_simulation: Boolean(isSimulation),
         updated_at: new Date().toISOString()
       });
-    }
+    
     try {
       localStorage.removeItem(storageKey);
     } catch {
