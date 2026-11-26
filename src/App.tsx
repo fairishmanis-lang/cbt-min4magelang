@@ -1477,7 +1477,9 @@ function CbtMin4MagelangApp() {
           .eq("is_simulation", false)
           .limit(1);
         if (mounted) {
-          setHasProductionAdmin(Array.isArray(adminRows) && adminRows.length > 0);
+          if (Array.isArray(adminRows) && adminRows.length > 0) {
+  setHasProductionAdmin(true);
+}
         }
         const { data: sessionData } = await supabase.auth.getSession();
         const authUser = sessionData?.session?.user;
