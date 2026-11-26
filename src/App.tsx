@@ -1557,13 +1557,13 @@ function CbtMin4MagelangApp() {
         .select("*")
         .eq("is_simulation", simFlag)
         .order("created_at", { ascending: false })
-        .limit(1000));
+        .limit(1000);
       const exBuilder = supabase
         .from("exams")
         .select("*")
         .eq("is_simulation", simFlag)
         .order("created_at", { ascending: false })
-        .limit(300));
+        .limit(300);
       if (isGuruUser && currentUser.id) {
         qBuilder.eq("created_by", currentUser.id);
         exBuilder.eq("created_by", currentUser.id);
