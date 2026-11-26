@@ -6257,14 +6257,17 @@ function StudentExamPortalView({
       (attempts.some(
         (a) =>
           a.exam_id === exam.id &&
+          (a.status === "SELESAI" || a.status === "AUTO_TIMEOUT") &&
           (String(a.student_id) === String(currentUser.id) ||
-            normalizePersonName(a.student_name) === normalizePersonName(currentUser.full_name))
+            normalizePersonName(a.student_name) ===
+              normalizePersonName(currentUser.full_name))
       ) ||
         examResults.some(
           (r) =>
             r.exam_id === exam.id &&
             (String(r.student_id) === String(currentUser.id) ||
-              normalizePersonName(r.student_name) === normalizePersonName(currentUser.full_name))
+              normalizePersonName(r.student_name) ===
+                normalizePersonName(currentUser.full_name))
         ));
     if (alreadyDone) {
       return showBanner("warning", "Anda sudah menyelesaikan ujian ini.");
@@ -6748,21 +6751,22 @@ function StudentExamPortalView({
         myExams.map((ex) => {
           const sub = subjects.find((s) => s.id === ex.subject_id);
           const done =
-            !isSimulation &&
-            (attempts.some(
-              (a) =>
-                a.exam_id === ex.id &&
-                (String(a.student_id) === String(currentUser.id) ||
-                  normalizePersonName(a.student_name) ===
-                    normalizePersonName(currentUser.full_name))
-            ) ||
-              examResults.some(
-                (r) =>
-                  r.exam_id === ex.id &&
-                  (String(r.student_id) === String(currentUser.id) ||
-                    normalizePersonName(r.student_name) ===
-                      normalizePersonName(currentUser.full_name))
-              ));
+  !isSimulation &&
+  (attempts.some(
+    (a) =>
+      a.exam_id === ex.id &&
+      (a.status === "SELESAI" || a.status === "AUTO_TIMEOUT") &&
+      (String(a.student_id) === String(currentUser.id) ||
+        normalizePersonName(a.student_name) ===
+          normalizePersonName(currentUser.full_name))
+  ) ||
+    examResults.some(
+      (r) =>
+        r.exam_id === ex.id &&
+        (String(r.student_id) === String(currentUser.id) ||
+          normalizePersonName(r.student_name) ===
+            normalizePersonName(currentUser.full_name))
+    ));
           const sched = evaluateExamSchedule(ex, nowTick);
           return (
             <div
