@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import {
   LayoutDashboard,
   Building2,
@@ -42,6 +42,8 @@ import {
 } from "lucide-react";
 import { parseExcelSoal, formatRichText } from "./utils/excelQuestionParser";
 import RichQuestionContent from "./components/RichQuestionContent";
+import { buildViolationPayload, VIOLATION_DEBOUNCE_MS } from "./utils/tabViolationGuard";
+import { ExamViolationModal } from "./components/ExamViolationModal";
 // ============================================================================
 // KLIEN SUPABASE REST & AUTH (TANPA DEPENDENSI BUNDLER EKSTERNAL)
 // ============================================================================
@@ -6002,8 +6004,77 @@ function StudentExamPortalView({
         : "Ujian berhasil dikumpulkan dan nilai telah tersimpan."
     );
   };
+  const [violationCount, setViolationCount] = useState<number>(0);
+  const [isExamLocked, setIsExamLocked] = useState<boolean>(false);
+  const [lockedReason, setLockedReason] = useState<string | null>(null);
+  const [warningOpen, setWarningOpen] = useState<boolean>(false);
+  const lastViolationAtRef = useRef<number>(0);
+
+  const currentAttemptId = useMemo(() => {
+    if (!activeExam || !currentUser || !Array.isArray(attempts)) return null;
+    const found = attempts.find(
+      (a: any) =>
+        String(a.exam_id) === String(activeExam.id) &&
+        String(a.student_id) === String(currentUser.id) &&
+        a.status !== "SELESAI" &&
+        a.status !== "AUTO_TIMEOUT"
+    );
+    return found?.id ?? null;
+  }, [attempts, activeExam, currentUser]);
+
   useEffect(() => {
-    if (!activeExam) return;
+    if (!activeExam || !currentAttemptId) {
+      setViolationCount(0);
+      setIsExamLocked(false);
+      setLockedReason(null);
+      setWarningOpen(false);
+      return;
+    }
+    const row = Array.isArray(attempts)
+      ? attempts.find((a: any) => String(a.id) === String(currentAttemptId))
+      : null;
+    setViolationCount(Number(row?.violation_count ?? 0));
+    setIsExamLocked(Boolean(row?.is_locked));
+    setLockedReason(row?.locked_reason ?? null);
+  }, [activeExam, currentAttemptId, attempts]);
+
+  useEffect(() => {
+    if (!activeExam || !currentAttemptId || isExamLocked || !supabase) return;
+
+    const handleViolation = () => {
+      const now = Date.now();
+      if (now - lastViolationAtRef.current < VIOLATION_DEBOUNCE_MS) return;
+      lastViolationAtRef.current = now;
+
+      const { nextCount, shouldLock, payload } = buildViolationPayload(violationCount);
+      setViolationCount(nextCount);
+      setIsExamLocked(shouldLock);
+      setLockedReason(payload.locked_reason);
+      if (!shouldLock) setWarningOpen(true);
+
+      void supabase
+        .from("exam_attempts")
+        .update(payload)
+        .eq("id", currentAttemptId);
+    };
+
+    const onVisibilityChange = () => {
+      if (document.hidden) handleViolation();
+    };
+
+    const onWindowBlur = () => {
+      handleViolation();
+    };
+
+    document.addEventListener("visibilitychange", onVisibilityChange);
+    window.addEventListener("blur", onWindowBlur);
+    return () => {
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+      window.removeEventListener("blur", onWindowBlur);
+    };
+  }, [activeExam, currentAttemptId, isExamLocked, violationCount, supabase]);
+  useEffect(() => {
+    if (!activeExam || isExamLocked) return;
     const timer = setInterval(() => {
       const nowMs = Date.now();
       const sched = evaluateExamSchedule(activeExam, nowMs);
@@ -6025,7 +6096,7 @@ function StudentExamPortalView({
       });
     }, 1000);
     return () => clearInterval(timer);
-  }, [activeExam]);
+  }, [activeExam, isExamLocked]);
   if (mode === "student_history") {
     const myResults = examResults.filter(
       (r) =>
@@ -6516,6 +6587,13 @@ function StudentExamPortalView({
             </div>
           </div>
         )}
+        <ExamViolationModal
+        isLocked={isExamLocked}
+        lockedReason={lockedReason ?? undefined}
+        violationCount={violationCount}
+        warningOpen={warningOpen}
+        onDismissWarning={() => setWarningOpen(false)}
+      />
       </div>
     );
   }
