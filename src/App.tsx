@@ -5850,6 +5850,7 @@ function ParticipantsManagerView({
                     <span className="px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-800 font-bold">
                       {p.statusLabel}
                     </span>
+                    </td>
                     <td className="p-3 text-center space-y-1">
                       <div className="text-[11px] font-bold">
                         {p.isLocked ? (
@@ -5872,8 +5873,7 @@ function ParticipantsManagerView({
                           {resettingAttemptId === p.attemptId ? "Mereset..." : "Reset Pelanggaran"}
                         </button>
                       )}
-                    </td>
-                  </td>
+                      </td>
                 </tr>
               ))
             )}
