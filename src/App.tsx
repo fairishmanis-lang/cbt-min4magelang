@@ -1566,6 +1566,58 @@ function CbtMin4MagelangApp() {
         qBuilder.eq("created_by", currentUser.id);
         exBuilder.eq("created_by", currentUser.id);
       }
+      const isStudentUser = currentUser.role === "SISWA" && Boolean(currentUser.id);
+    const partQuery = isStudentUser
+      ? supabase
+          .from("exam_participants")
+          .select("*")
+          .eq("is_simulation", simFlag)
+          .eq("student_id", currentUser.id)
+          .limit(2000)
+      : supabase
+          .from("exam_participants")
+          .select("*")
+          .eq("is_simulation", simFlag)
+          .limit(10000);
+
+    const attQuery = isStudentUser
+      ? supabase
+          .from("exam_attempts")
+          .select("*")
+          .eq("is_simulation", simFlag)
+          .eq("student_id", currentUser.id)
+          .limit(2000)
+      : supabase
+          .from("exam_attempts")
+          .select("*")
+          .eq("is_simulation", simFlag)
+          .limit(10000);
+
+    const ansQuery = isStudentUser
+      ? supabase
+          .from("student_answers")
+          .select("*")
+          .eq("is_simulation", simFlag)
+          .eq("student_id", currentUser.id)
+          .limit(5000)
+      : supabase
+          .from("student_answers")
+          .select("*")
+          .eq("is_simulation", simFlag)
+          .limit(50000);
+
+    const resQuery = isStudentUser
+      ? supabase
+          .from("exam_results")
+          .select("*")
+          .eq("is_simulation", simFlag)
+          .eq("student_id", currentUser.id)
+          .limit(2000)
+      : supabase
+          .from("exam_results")
+          .select("*")
+          .eq("is_simulation", simFlag)
+          .limit(10000);
       const [
         profRes,
         clsRes,
@@ -1596,10 +1648,10 @@ function CbtMin4MagelangApp() {
           .limit(5000),
         qBuilder,
         exBuilder,
-        supabase.from("exam_participants").select("*").eq("is_simulation", simFlag).limit(10000),
-        supabase.from("exam_attempts").select("*").eq("is_simulation", simFlag).limit(10000),
-        supabase.from("student_answers").select("*").eq("is_simulation", simFlag).limit(50000),
-        supabase.from("exam_results").select("*").eq("is_simulation", simFlag).limit(10000)
+        partQuery,
+    attQuery,
+    ansQuery,
+    resQuery
       ]);
       if (profRes.data) setProfilesList(profRes.data);
       if (clsRes.data) setClassesList(clsRes.data);
