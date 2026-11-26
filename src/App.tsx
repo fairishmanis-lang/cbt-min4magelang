@@ -1522,6 +1522,32 @@ function CbtMin4MagelangApp() {
         }
       }
       if (!currentUser) return;
+      if (currentUser?.id) {
+      const pendingQueueKey = `cbt_min4_pending_results_${currentUser.id}`;
+      try {
+        const rawQueue = localStorage.getItem(pendingQueueKey);
+        const parsedQueue = rawQueue ? JSON.parse(rawQueue) : [];
+        if (Array.isArray(parsedQueue) && parsedQueue.length > 0) {
+          const remainingQueue = [];
+          for (const item of parsedQueue) {
+            if (!item?.id) continue;
+            const { error: retryError } = await supabase
+              .from("exam_results")
+              .upsert(item);
+            if (retryError) {
+              remainingQueue.push(item);
+            }
+          }
+          if (remainingQueue.length > 0) {
+            localStorage.setItem(pendingQueueKey, JSON.stringify(remainingQueue));
+          } else {
+            localStorage.removeItem(pendingQueueKey);
+          }
+        }
+      } catch {
+        // Abaikan error sinkronisasi antrean sementara
+      }
+    }
       const simFlag = Boolean(isSimulationMode);
       const isGuruUser = currentUser.role === "GURU";
       const qBuilder = supabase
@@ -6072,20 +6098,42 @@ function StudentExamPortalView({
         questions
       );
       const summary = computeExamScoreSummary(fullQuestions, currentAnswers, gradingFormula);
-      const resultId = `${targetExam.id}_${currentUser.id}`;
-      await supabase.from("exam_results").upsert({
-        id: resultId,
-        exam_id: targetExam.id,
-        exam_title: targetExam.title,
-        student_id: currentUser.id,
-        student_name: currentUser.full_name,
-        score: summary.finalScore,
-        correct_count: summary.correctCount,
-        wrong_count: summary.wrongCount,
-        empty_count: summary.emptyCount,
-        is_simulation: Boolean(isSimulation),
-        updated_at: new Date().toISOString()
-      });
+const resultId = `${targetExam.id}_${currentUser.id}`;
+const pendingQueueKey = `cbt_min4_pending_results_${currentUser.id}`;
+const resultPayload = {
+  id: resultId,
+  exam_id: targetExam.id,
+  exam_title: targetExam.title,
+  student_id: currentUser.id,
+  student_name: currentUser.full_name,
+  score: summary.finalScore,
+  correct_count: summary.correctCount,
+  wrong_count: summary.wrongCount,
+  empty_count: summary.emptyCount,
+  is_simulation: Boolean(isSimulation),
+  updated_at: new Date().toISOString()
+};
+let savedToServer = false;
+try {
+  const { error: upsertResultError } = await supabase
+    .from("exam_results")
+    .upsert(resultPayload);
+  if (upsertResultError) {
+    throw upsertResultError;
+  }
+  savedToServer = true;
+} catch {
+  try {
+    const existingRaw = localStorage.getItem(pendingQueueKey);
+    const existingQueue = existingRaw ? JSON.parse(existingRaw) : [];
+    const safeQueue = Array.isArray(existingQueue) ? existingQueue : [];
+    const filteredQueue = safeQueue.filter((item) => item?.id !== resultId);
+    filteredQueue.push(resultPayload);
+    localStorage.setItem(pendingQueueKey, JSON.stringify(filteredQueue));
+  } catch {
+    // Abaikan error storage
+  }
+}
     
     try {
       localStorage.removeItem(storageKey);
