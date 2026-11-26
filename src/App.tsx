@@ -6183,6 +6183,44 @@ function StudentExamPortalView({
       });
     const durationSec = (Number(exam.duration_minutes) || 60) * 60;
     const scheduleSec = Math.max(0, Math.floor((sched.remainingMs || durationSec * 1000) / 1000));
+    const existingActiveAttempt = Array.isArray(attempts)
+  ? attempts.find(
+      (a: any) =>
+        String(a.exam_id) === String(exam.id) &&
+        String(a.student_id) === String(currentUser.id) &&
+        a.status !== "SELESAI" &&
+        a.status !== "AUTO_TIMEOUT"
+    )
+  : null;
+    if (!existingActiveAttempt && supabase) {
+  void supabase
+    .from("exam_attempts")
+    .insert({
+      exam_id: exam.id,
+      student_id: currentUser.id,
+      student_name: currentUser.full_name,
+      answers: restoredMap,
+      status: "SEDANG_MENGERJAKAN",
+      is_simulation: Boolean(isSimulation),
+      is_active: true,
+      violation_count: 0,
+      is_locked: false,
+      locked_reason: null,
+    })
+    .select("*")
+    .single()
+    .then(({ data: insertedAttempt, error: attemptError }) => {
+      if (!attemptError && insertedAttempt) {
+        setAttempts((prev: any[]) => {
+          const safePrev = Array.isArray(prev) ? prev : [];
+          const exists = safePrev.some(
+            (item: any) => String(item.id) === String(insertedAttempt.id)
+          );
+          return exists ? safePrev : [insertedAttempt, ...safePrev];
+        });
+      }
+    });
+}
     setActiveExam(exam);
     setCurrentIndex(0);
     setAnswersMap(restoredMap);
