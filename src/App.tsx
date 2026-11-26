@@ -1618,6 +1618,45 @@ function CbtMin4MagelangApp() {
           .select("*")
           .eq("is_simulation", simFlag)
           .limit(10000);
+      const profQuery = isStudentUser
+  ? supabase
+      .from("profiles")
+      .select("*")
+      .eq("is_simulation", simFlag)
+      .eq("id", currentUser.id)
+      .limit(10)
+  : supabase
+      .from("profiles")
+      .select("*")
+      .eq("is_simulation", simFlag)
+      .limit(2000);
+
+const tchQuery = isStudentUser
+  ? supabase
+      .from("teachers")
+      .select("*")
+      .eq("is_simulation", simFlag)
+      .limit(50)
+  : supabase
+      .from("teachers")
+      .select("*")
+      .eq("is_simulation", simFlag)
+      .order("full_name")
+      .limit(2000);
+
+const stdQuery = isStudentUser
+  ? supabase
+      .from("students")
+      .select("*")
+      .eq("is_simulation", simFlag)
+      .eq("id", currentUser.id)
+      .limit(10)
+  : supabase
+      .from("students")
+      .select("*")
+      .eq("is_simulation", simFlag)
+      .order("full_name")
+      .limit(5000);
       const [
         profRes,
         clsRes,
@@ -1631,26 +1670,16 @@ function CbtMin4MagelangApp() {
         ansRes,
         resRes
       ] = await Promise.all([
-        supabase.from("profiles").select("*").eq("is_simulation", simFlag).limit(2000),
+        profQuery,
         supabase.from("classes").select("*").eq("is_simulation", simFlag).order("name").limit(1000),
         supabase.from("subjects").select("*").eq("is_simulation", simFlag).order("name").limit(1000),
-        supabase
-          .from("teachers")
-          .select("*")
-          .eq("is_simulation", simFlag)
-          .order("full_name")
-          .limit(2000),
-        supabase
-          .from("students")
-          .select("*")
-          .eq("is_simulation", simFlag)
-          .order("full_name")
-          .limit(5000),
+        tchQuery,
+        stdQuery,
         qBuilder,
-        exBuilder,
-        partQuery,
-    attQuery,
-    ansQuery,
+      exBuilder,
+      partQuery,
+      attQuery,
+      ansQuery,
     resQuery
       ]);
       if (profRes.data) setProfilesList(profRes.data);
