@@ -5451,6 +5451,38 @@ function ParticipantsManagerView({
       prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]
     );
   };
+  const [resettingAttemptId, setResettingAttemptId] = useState("");
+
+  const handleResetViolation = async (attemptId: string, studentName?: string) => {
+    if (!supabase || !attemptId) return;
+    setResettingAttemptId(attemptId);
+    try {
+      const { error } = await supabase
+        .from("exam_attempts")
+        .update({
+          violation_count: 0,
+          is_locked: false,
+          locked_reason: null,
+          last_violation_at: null,
+          is_active: true,
+          status: "SEDANG_MENGERJAKAN",
+        })
+        .eq("id", attemptId);
+
+      if (error) {
+        showBanner?.("error", `Gagal mereset pelanggaran: ${error.message}`);
+        return;
+      }
+
+      showBanner?.(
+        "success",
+        `Pelanggaran ${studentName || "siswa"} berhasil direset ke 0.`
+      );
+      await onRefresh?.();
+    } finally {
+      setResettingAttemptId("");
+    }
+  };
   const combinedParticipants = useMemo(() => {
     if (!selectedExamId) return [];
     const byStudentKey = new Map();
@@ -5507,31 +5539,45 @@ function ParticipantsManagerView({
           });
         }
       });
-    attempts
-      .filter((a) => a.exam_id === selectedExamId)
-      .forEach((a) => {
-        const stObj = resolveStudent(a.student_id, a.student_name, "");
-        const key =
-          normalizePersonName(stObj?.full_name || a.student_name) ||
-          String(stObj?.id || a.student_id);
-        if (!byStudentKey.has(key)) {
-          const resObj = examResults.find(
-            (r) =>
-              r.exam_id === selectedExamId &&
-              (String(r.student_id) === String(a.student_id) ||
-                normalizePersonName(r.student_name) === normalizePersonName(a.student_name))
-          );
-          byStudentKey.set(key, {
-            id: a.id,
-            student_id: stObj?.id || a.student_id,
-            student_name: stObj?.full_name || a.student_name,
-            nis: stObj?.nis || "",
-            nisn: stObj?.nisn || "",
-            class_id: stObj?.class_id || "",
-            statusLabel: `Sudah Mengerjakan${resObj ? ` (Nilai: ${resObj.score})` : ""}`
-          });
-        }
-      });
+   attempts
+        .filter((a) => a.exam_id === selectedExamId)
+        .forEach((a) => {
+          const stObj = resolveStudent(a.student_id, a.student_name, "");
+          const key =
+            normalizePersonName(stObj?.full_name || a.student_name) ||
+            String(stObj?.id || a.student_id);
+          const vCount = Number(a.violation_count ?? 0);
+          const locked = Boolean(a.is_locked);
+
+          if (!byStudentKey.has(key)) {
+            const resObj = examResults.find(
+              (r) =>
+                r.exam_id === selectedExamId &&
+                (String(r.student_id) === String(a.student_id) ||
+                  normalizePersonName(r.student_name) === normalizePersonName(a.student_name))
+            );
+            byStudentKey.set(key, {
+              id: a.id,
+              student_id: stObj?.id || a.student_id,
+              student_name: stObj?.full_name || a.student_name,
+              nis: stObj?.nis || "",
+              nisn: stObj?.nisn || "",
+              class_id: stObj?.class_id || "",
+              statusLabel: `Sudah Mengerjakan${resObj ? ` (Nilai: ${resObj.score})` : ""}`,
+              attemptId: a.id,
+              violationCount: vCount,
+              isLocked: locked,
+            });
+          } else {
+            const existing = byStudentKey.get(key);
+            byStudentKey.set(key, {
+              ...existing,
+              attemptId: existing.attemptId || a.id,
+              violationCount: Math.max(Number(existing.violationCount ?? 0), vCount),
+              isLocked: Boolean(existing.isLocked) || locked,
+            });
+          }
+        });
     return Array.from(byStudentKey.values()).sort((a, b) =>
       (a.student_name || "").localeCompare(b.student_name || "", "id")
     );
@@ -5782,6 +5828,7 @@ function ParticipantsManagerView({
               <th className="p-3 text-left">Nama Peserta</th>
               <th className="p-3 text-left">Kelas</th>
               <th className="p-3 text-center">Status</th>
+              <th className="p-3 text-center">Pelanggaran</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
@@ -5803,6 +5850,29 @@ function ParticipantsManagerView({
                     <span className="px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-800 font-bold">
                       {p.statusLabel}
                     </span>
+                    <td className="p-3 text-center space-y-1">
+                      <div className="text-[11px] font-bold">
+                        {p.isLocked ? (
+                          <span className="px-2 py-0.5 rounded-full bg-rose-100 text-rose-700">
+                            Terkunci ({p.violationCount ?? 0}x)
+                          </span>
+                        ) : (
+                          <span className="text-slate-600">
+                            {p.violationCount ?? 0}x pelanggaran
+                          </span>
+                        )}
+                      </div>
+                      {p.attemptId && ((p.violationCount ?? 0) > 0 || p.isLocked) && (
+                        <button
+                          type="button"
+                          disabled={resettingAttemptId === p.attemptId}
+                          onClick={() => handleResetViolation(p.attemptId, p.student_name)}
+                          className="px-2.5 py-1 rounded-lg bg-amber-600 hover:bg-amber-700 disabled:opacity-50 text-white text-[11px] font-bold"
+                        >
+                          {resettingAttemptId === p.attemptId ? "Mereset..." : "Reset Pelanggaran"}
+                        </button>
+                      )}
+                    </td>
                   </td>
                 </tr>
               ))
