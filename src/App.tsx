@@ -6176,11 +6176,17 @@ function StudentExamPortalView({
       const nowMs = Date.now();
       const sched = evaluateExamSchedule(activeExam, nowMs);
       if (!sched.canOpen) {
-        clearInterval(timer);
-        setSecondsLeft(0);
-        handleSubmitExam(true, activeExam);
-        return;
-      }
+  const isPastEndWithGrace =
+    sched.statusCode === "ENDED" &&
+    sched.endDt instanceof Date &&
+    nowMs > sched.endDt.getTime() + 15000;
+  if (isPastEndWithGrace) {
+    clearInterval(timer);
+    setSecondsLeft(0);
+    void handleSubmitExam(true, activeExam);
+    return;
+  }
+}
       setSecondsLeft((prev) => {
         const scheduleSec = Math.max(0, Math.floor((sched.remainingMs || 0) / 1000));
         const nextVal = Math.min(prev > 0 ? prev - 1 : scheduleSec, scheduleSec);
