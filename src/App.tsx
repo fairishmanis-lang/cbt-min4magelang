@@ -1508,7 +1508,7 @@ function CbtMin4MagelangApp() {
   const refreshAllData = async () => {
     if (!supabase) return;
     try {
-      const { data: settingsRows } = await supabase.from("school_settings").select("*");
+      const { data: settingsRows } = await supabase.from("school_settings").select("id, data")
       if (Array.isArray(settingsRows)) {
         const defaultRow = settingsRows.find((r) => r.id === "default");
         if (defaultRow?.data) {
@@ -1557,13 +1557,13 @@ function CbtMin4MagelangApp() {
         .select("*")
         .eq("is_simulation", simFlag)
         .order("created_at", { ascending: false })
-        .limit(5000);
+        .limit(1000));
       const exBuilder = supabase
         .from("exams")
         .select("*")
         .eq("is_simulation", simFlag)
         .order("created_at", { ascending: false })
-        .limit(1000);
+        .limit(300));
       if (isGuruUser && currentUser.id) {
         qBuilder.eq("created_by", currentUser.id);
         exBuilder.eq("created_by", currentUser.id);
@@ -1575,12 +1575,12 @@ function CbtMin4MagelangApp() {
           .select("*")
           .eq("is_simulation", simFlag)
           .eq("student_id", currentUser.id)
-          .limit(2000)
+          .limit(300)
       : supabase
           .from("exam_participants")
           .select("*")
           .eq("is_simulation", simFlag)
-          .limit(10000);
+          .limit(2000);
 
     const attQuery = isStudentUser
       ? supabase
@@ -1588,12 +1588,12 @@ function CbtMin4MagelangApp() {
           .select("*")
           .eq("is_simulation", simFlag)
           .eq("student_id", currentUser.id)
-          .limit(2000)
+          .limit(200)
       : supabase
           .from("exam_attempts")
           .select("*")
           .eq("is_simulation", simFlag)
-          .limit(10000);
+          .limit(2000);
 
     const ansQuery = isStudentUser
       ? supabase
@@ -1601,12 +1601,12 @@ function CbtMin4MagelangApp() {
           .select("*")
           .eq("is_simulation", simFlag)
           .eq("student_id", currentUser.id)
-          .limit(5000)
+          .limit(500)
       : supabase
           .from("student_answers")
           .select("*")
           .eq("is_simulation", simFlag)
-          .limit(50000);
+          .limit(5000);
 
     const resQuery = isStudentUser
       ? supabase
@@ -1619,46 +1619,46 @@ function CbtMin4MagelangApp() {
           .from("exam_results")
           .select("*")
           .eq("is_simulation", simFlag)
-          .limit(10000);
+          .limit(500);
       const profQuery = isStudentUser
   ? supabase
       .from("profiles")
-      .select("*")
+      .select("id, full_name, role, is_active, is_simulation")
       .eq("is_simulation", simFlag)
       .eq("id", currentUser.id)
       .limit(10)
   : supabase
       .from("profiles")
-      .select("*")
+      .select("id, full_name, username, email, nisn, nip, role, is_active, is_simulation")
       .eq("is_simulation", simFlag)
       .limit(2000);
 
 const tchQuery = isStudentUser
   ? supabase
       .from("teachers")
-      .select("*")
+      .select("id, full_name, subject_id, is_active, is_simulation")
       .eq("is_simulation", simFlag)
-      .limit(50)
+      .limit(20)
   : supabase
       .from("teachers")
-      .select("*")
+      .select("id, full_name, nip, username, subject_id, is_active, is_simulation")
       .eq("is_simulation", simFlag)
       .order("full_name")
-      .limit(2000);
+      .limit(500);
 
 const stdQuery = isStudentUser
   ? supabase
       .from("students")
-      .select("*")
+      .select("id, nis, nisn, full_name, class_id, username, is_active, is_simulation")
       .eq("is_simulation", simFlag)
       .eq("id", currentUser.id)
-      .limit(10)
+      .limit(3)
   : supabase
       .from("students")
-      .select("*")
+      .select("id, nis, nisn, full_name, class_id, username, password, is_active, is_simulation")
       .eq("is_simulation", simFlag)
       .order("full_name")
-      .limit(5000);
+      .limit(1500);
       const [
         profRes,
         clsRes,
@@ -1673,8 +1673,8 @@ const stdQuery = isStudentUser
         resRes
       ] = await Promise.all([
         profQuery,
-        supabase.from("classes").select("*").eq("is_simulation", simFlag).order("name").limit(1000),
-        supabase.from("subjects").select("*").eq("is_simulation", simFlag).order("name").limit(1000),
+        supabase.from("classes").select("id, name, grade_level, is_simulation").eq("is_simulation", simFlag).order("name").limit(200),
+        supabase.from("subjects").select("id, code, name, is_simulation").eq("is_simulation", simFlag).order("name").limit(200),
         tchQuery,
         stdQuery,
         qBuilder,
